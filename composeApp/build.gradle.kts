@@ -55,6 +55,9 @@ kotlin {
 }
 
 android {
+    val localProperties = org.jetbrains.kotlin.konan.properties.Properties()
+    if (rootProject.file("local.properties").canRead()) localProperties.load(rootProject.file("local.properties").inputStream())
+
     namespace = "org.example.project"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
@@ -65,14 +68,30 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
+    val config = localProperties.getProperty("androidStoreFile")?.let {
+        signingConfigs.create("config") {
+            storeFile = file(it)
+            storePassword = localProperties.getProperty("androidStorePassword")
+            keyAlias = localProperties.getProperty("androidKeyAlias")
+            keyPassword = localProperties.getProperty("androidKeyPassword")
+            enableV3Signing = true
+            enableV4Signing = true
+        }
+    }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
     buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
+        all {
+            signingConfig = config ?: signingConfigs["debug"]
+        }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            vcsInfo.include = false
+            setProguardFiles(listOf(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"))
         }
     }
     compileOptions {
