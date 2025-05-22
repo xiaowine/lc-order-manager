@@ -1,6 +1,5 @@
 package org.example.project.ui.pages.settings
 
-
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,27 +23,37 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.example.project.data.UserInputErrorEnum
 import org.example.project.data.dao.UserDao
 import org.example.project.data.entity.User
+import org.example.project.data.network.MemberApi.getCustomerInfo
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 
-data class UserFormState(
-    val userName: String = "",
-    val key: String = "",
-    val isError: Boolean = false,
-    val errorType: UserInputErrorEnum = UserInputErrorEnum.NONE
-)
+private interface FormState {
+    var userName: MutableState<String>
+    var key: MutableState<String>
+    var isError: MutableState<Boolean>
+    var errorType: MutableState<UserInputErrorEnum>
+}
 
 @Composable
 fun SettingsUsersPage(repository: UserDao, padding: PaddingValues) {
     val users by repository.getAllUsers().collectAsState(initial = emptyList())
-    var formState by remember { mutableStateOf(UserFormState()) }
+    val formState = remember {
+        object : FormState {
+            override var userName = mutableStateOf("")
+            override var key = mutableStateOf("")
+            override var isError = mutableStateOf(false)
+            override var errorType = mutableStateOf(UserInputErrorEnum.NONE)
+        }
+    }
     val coroutineScope = rememberCoroutineScope()
 
     Column(
@@ -53,12 +64,18 @@ fun SettingsUsersPage(repository: UserDao, padding: PaddingValues) {
     ) {
         UserInputForm(
             formState = formState,
-            onFormStateChange = { formState = it },
             onSubmit = { userName, key ->
                 coroutineScope.launch {
-                    handleUserSubmission(repository, userName, key) { newState ->
-                        formState = newState
-                    }
+                    handleUserSubmission(
+                        repository,
+                        userName,
+                        key,
+                        formState = formState,
+                        onError = {
+                            formState.isError.value = true
+                            formState.errorType.value = UserInputErrorEnum.NETWORK_ERROR
+                        }
+                    )
                 }
             }
         )
@@ -72,31 +89,36 @@ fun SettingsUsersPage(repository: UserDao, padding: PaddingValues) {
 
 @Composable
 private fun UserInputForm(
-    formState: UserFormState,
-    onFormStateChange: (UserFormState) -> Unit,
+    formState: FormState,
     onSubmit: (String, String) -> Unit
 ) {
-    if (formState.isError) {
-        Text(formState.errorType.name)
+    if (formState.isError.value) {
+        Text(formState.errorType.value.name)
     }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         TextField(
-            value = formState.userName,
-            onValueChange = { onFormStateChange(formState.copy(userName = it)) },
+            value = formState.userName.value,
+            onValueChange = { formState.userName.value = it },
             label = "用户名",
-            modifier = Modifier.weight(0.4f).padding(end = 8.dp),
+            modifier = Modifier
+                .weight(0.3f)
+                .padding(end = 8.dp),
             singleLine = true,
         )
         TextField(
-            value = formState.key,
-            onValueChange = { onFormStateChange(formState.copy(key = it)) },
+            value = formState.key.value,
+            onValueChange = { formState.key.value = it },
             label = "Key",
-            modifier = Modifier.weight(0.6f).padding(end = 8.dp),
+            modifier = Modifier
+                .weight(0.6f)
+                .padding(end = 8.dp),
             singleLine = true,
         )
         Button(
-            onClick = { onSubmit(formState.userName, formState.key) }
+            onClick = {
+                onSubmit(formState.userName.value, formState.key.value)
+            }
         ) {
             Text(
                 text = "添加",
@@ -131,12 +153,16 @@ private fun UserListItem(
     onDelete: () -> Unit
 ) {
     var isKeyVisible by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var verificationResult by remember { mutableStateOf<Boolean?>(null) }
+    val coroutineScope = rememberCoroutineScope()
 
     Row(
         Modifier
             .fillMaxWidth()
             .padding(12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
             Text(user.name)
@@ -148,14 +174,58 @@ private fun UserListItem(
                     .padding(top = 4.dp),
             )
         }
-        Button(
-            modifier = Modifier.padding(start = 8.dp),
-            onClick = onDelete
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = "删除",
-                color = MiuixTheme.colorScheme.primary
-            )
+            if (isLoading) {
+                InfiniteProgressIndicator(
+                    modifier = Modifier.padding(8.dp),
+                    color = MiuixTheme.colorScheme.primary
+                )
+            }
+            verificationResult?.let { result ->
+                Text(
+                    text = "验证\n${if (result) "成功" else "失败"}",
+                    color = if (result) Color(74, 109, 66) else Color(168, 62, 76),
+                    modifier = Modifier.padding(top = 4.dp).clickable {
+                        verificationResult = null
+                    }
+                )
+                LaunchedEffect(Unit) {
+                    if (verificationResult == false) return@LaunchedEffect
+                    delay(10000)
+                    verificationResult = null
+                }
+            }
+            Button(
+                onClick = {
+                    isLoading = true
+                    coroutineScope.launch {
+                        try {
+                            val response = getCustomerInfo(user.key)
+                            verificationResult = response.code == 200
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                }
+            ) {
+                Text(
+                    text = "验证",
+                    color = MiuixTheme.colorScheme.primary
+                )
+            }
+
+            Button(
+                onClick = onDelete
+            ) {
+                Text(
+                    text = "删除",
+                    color = MiuixTheme.colorScheme.primary
+                )
+            }
         }
     }
 }
@@ -164,16 +234,61 @@ private suspend fun handleUserSubmission(
     repository: UserDao,
     userName: String,
     key: String,
-    onStateUpdate: (UserFormState) -> Unit
+    formState: FormState,
+    onError: () -> Unit
 ) {
     when {
-        userName.isBlank() -> onStateUpdate(UserFormState(userName = userName, key = key, isError = true, errorType = UserInputErrorEnum.EMPTY_NAME))
-        key.isBlank() -> onStateUpdate(UserFormState(userName = userName, key = key, isError = true, errorType = UserInputErrorEnum.EMPTY_KEY))
-        repository.existUserByName(userName) -> onStateUpdate(UserFormState(userName = userName, key = key, isError = true, errorType = UserInputErrorEnum.REPEAT_NAME))
-        repository.existUserByKey(key) -> onStateUpdate(UserFormState(userName = userName, key = key, isError = true, errorType = UserInputErrorEnum.REPEAT_KEY))
+        userName.isBlank() -> {
+            formState.apply {
+                this.userName.value = userName
+                this.key.value = key
+                isError.value = true
+                errorType.value = UserInputErrorEnum.EMPTY_NAME
+            }
+        }
+
+        key.isBlank() -> {
+            formState.apply {
+                this.userName.value = userName
+                this.key.value = key
+                isError.value = true
+                errorType.value = UserInputErrorEnum.EMPTY_KEY
+            }
+        }
+
+        repository.existUserByName(userName) -> {
+            formState.apply {
+                this.userName.value = userName
+                this.key.value = key
+                isError.value = true
+                errorType.value = UserInputErrorEnum.REPEAT_NAME
+            }
+        }
+
+        repository.existUserByKey(key) -> {
+            formState.apply {
+                this.userName.value = userName
+                this.key.value = key
+                isError.value = true
+                errorType.value = UserInputErrorEnum.REPEAT_KEY
+            }
+        }
+
         else -> {
-            repository.insertUser(User(name = userName, key = key))
-            onStateUpdate(UserFormState())
+            val user = User(name = userName, key = key)
+            val response = getCustomerInfo(key)
+            if (response.code == 200) {
+                repository.insertUser(user)
+                formState.apply {
+                    this.userName.value = ""
+                    this.key.value = ""
+                    isError.value = false
+                    errorType.value = UserInputErrorEnum.NONE
+                }
+            } else {
+                onError()
+            }
         }
     }
 }
+

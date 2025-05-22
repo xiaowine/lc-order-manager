@@ -10,6 +10,7 @@ plugins {
     alias(libs.plugins.composeHotReload)
     id("androidx.room") version "2.7.1"
     id("com.google.devtools.ksp") version "2.1.20-2.0.1"
+    kotlin("plugin.serialization") version "2.1.20"
 }
 
 kotlin {
@@ -41,9 +42,10 @@ kotlin {
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodel)
-
             implementation(libs.androidx.sqlite.bundled)
             implementation(libs.miuix)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.kotlinx.json)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)

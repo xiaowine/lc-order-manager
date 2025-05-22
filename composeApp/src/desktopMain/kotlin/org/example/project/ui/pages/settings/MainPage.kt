@@ -48,7 +48,7 @@ actual fun MainPage() {
             settingsMenuItems.forEach { item ->
                 val isSelected = item.first == selectedMenu
                 val tint = if (isSelected) {
-                    MiuixTheme.colorScheme.onSurfaceContainer.copy(alpha = 0.6f)
+                    MiuixTheme.colorScheme.onSurfaceContainer
                 } else {
                     MiuixTheme.colorScheme.onSurfaceContainerVariant.copy(alpha = 0.6f)
                 }
@@ -68,7 +68,7 @@ actual fun MainPage() {
                     ) {
                         Image(
                             modifier = Modifier
-                                .size(32.dp),
+                                .size(26.dp),
                             imageVector = item.second,
                             contentDescription = item.first,
                             colorFilter = ColorFilter.tint(tint)
