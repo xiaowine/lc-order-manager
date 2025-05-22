@@ -23,8 +23,8 @@ jobs:
           - os: ubuntu-latest
             platform: linux x64
             platformEx: android aarch64
-            build-command: ./gradlew :composeApp:packageReleaseDeb
-            build-commandEx: ./gradlew :composeApp:assembleRelease
+            build-command: ./gradlew createReleaseDistributable
+            build-commandEx: ./gradlew assembleDebug && ./gradlew assembleRelease
             artifact-path: composeApp/build/compose/binaries/main-release/
             artifact-pathEx: composeApp/build/outputs/apk/release
             artifact-name: project-linux-x64
