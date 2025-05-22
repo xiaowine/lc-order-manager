@@ -5,21 +5,22 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidApplication)
+    alias(libs.plugins.androidxRoom)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
-    id("androidx.room") version "2.7.1"
-    id("com.google.devtools.ksp") version "2.1.20-2.0.1"
-    kotlin("plugin.serialization") version "2.1.20"
+    alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.googleKsp)
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
 }
 
 kotlin {
-    androidTarget {
-        @OptIn(ExperimentalKotlinGradlePluginApi::class)
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
-        }
-    }
+    jvmToolchain(21)
+
+    androidTarget()
 
     jvm("desktop")
 
