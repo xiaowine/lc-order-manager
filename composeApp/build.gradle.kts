@@ -69,7 +69,7 @@ android {
         versionName = "1.0"
     }
     val config = localProperties.getProperty("androidStoreFile")?.let {
-        signingConfigs.create("config") {
+        signingConfigs.create("release") {
             storeFile = file(it)
             storePassword = localProperties.getProperty("androidStorePassword")
             keyAlias = localProperties.getProperty("androidKeyAlias")
@@ -84,14 +84,15 @@ android {
         }
     }
     buildTypes {
-        all {
-            signingConfig = config ?: signingConfigs["debug"]
-        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             vcsInfo.include = false
-            setProguardFiles(listOf(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"))
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules-android.pro")
+            if (config != null) signingConfig = signingConfigs.getByName("release")
+        }
+        debug {
+            if (config != null) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
@@ -114,11 +115,22 @@ room {
 compose.desktop {
     application {
         mainClass = "org.example.project.MainKt"
+        buildTypes.release.proguard {
+            optimize = false
+            configurationFiles.from("proguard-rules-jvm.pro")
+        }
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "org.example.project"
             packageVersion = "1.0.0"
+
+            windows {
+                dirChooser = true
+                upgradeUuid = "8bc27e26-9f65-4aa6-bb63-f421a7170bb7"
+                menuGroup = "Project"
+                perUserInstall = true
+            }
         }
     }
 }
