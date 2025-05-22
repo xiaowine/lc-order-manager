@@ -6,19 +6,20 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
-import org.example.project.ui.pages.settings.SettingsPage
+import org.example.project.ui.pages.settings.MainPage
 
 @Composable
 @Preview
 fun App() {
     val colors = if (isSystemInDarkTheme()) {
-        darkColorScheme()
+        lightColorScheme()
+//        darkColorScheme()
     } else {
         lightColorScheme()
     }
     MiuixTheme(
         colors = colors
     ) {
-        SettingsPage()
+        MainPage()
     }
 }

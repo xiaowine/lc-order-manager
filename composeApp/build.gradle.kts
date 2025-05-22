@@ -26,11 +26,14 @@ kotlin {
         val desktopMain by getting
 
         androidMain.dependencies {
-
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
         }
         commonMain.dependencies {
+            implementation(libs.navigation.compose)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.ktor.client.cio)
+            implementation(libs.ktor.client.core)
             implementation(libs.androidx.room.runtime)
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -39,7 +42,7 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodel)
 
-            implementation("androidx.sqlite:sqlite-bundled:2.5.1")
+            implementation(libs.androidx.sqlite.bundled)
             implementation(libs.miuix)
         }
         desktopMain.dependencies {
