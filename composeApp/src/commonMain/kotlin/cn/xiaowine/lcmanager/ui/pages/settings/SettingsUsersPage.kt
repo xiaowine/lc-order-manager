@@ -1,5 +1,6 @@
 package cn.xiaowine.lcmanager.ui.pages.settings
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -23,21 +25,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import cn.xiaowine.lcmanager.data.UserInputErrorEnum
 import cn.xiaowine.lcmanager.data.dao.UserDao
 import cn.xiaowine.lcmanager.data.entity.User
 import cn.xiaowine.lcmanager.data.network.MemberApi.getCustomerInfo
-import top.yukonga.miuix.kmp.basic.Button
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.extra.SuperDialog
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private interface FormState {
-    var userName: MutableState<String>
     var key: MutableState<String>
     var isError: MutableState<Boolean>
     var errorType: MutableState<UserInputErrorEnum>
@@ -48,7 +51,6 @@ fun SettingsUsersPage(repository: UserDao, padding: PaddingValues) {
     val users by repository.getAllUsers().collectAsState(initial = emptyList())
     val formState = remember {
         object : FormState {
-            override var userName = mutableStateOf("")
             override var key = mutableStateOf("")
             override var isError = mutableStateOf(false)
             override var errorType = mutableStateOf(UserInputErrorEnum.NONE)
@@ -64,11 +66,10 @@ fun SettingsUsersPage(repository: UserDao, padding: PaddingValues) {
     ) {
         UserInputForm(
             formState = formState,
-            onSubmit = { userName, key ->
+            onSubmit = { key ->
                 coroutineScope.launch {
                     handleUserSubmission(
                         repository,
-                        userName,
                         key,
                         formState = formState,
                         onError = {
@@ -90,7 +91,7 @@ fun SettingsUsersPage(repository: UserDao, padding: PaddingValues) {
 @Composable
 private fun UserInputForm(
     formState: FormState,
-    onSubmit: (String, String) -> Unit
+    onSubmit: (String) -> Unit
 ) {
     if (formState.isError.value) {
         Text(formState.errorType.value.name)
@@ -98,33 +99,21 @@ private fun UserInputForm(
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         TextField(
-            value = formState.userName.value,
-            onValueChange = { formState.userName.value = it },
-            label = "用户名",
-            modifier = Modifier
-                .weight(0.3f)
-                .padding(end = 8.dp),
-            singleLine = true,
-        )
-        TextField(
             value = formState.key.value,
             onValueChange = { formState.key.value = it },
-            label = "Key",
+            label = "请输入立创商城Key",
             modifier = Modifier
-                .weight(0.6f)
+                .weight(1f)
                 .padding(end = 8.dp),
             singleLine = true,
         )
-        Button(
+        TextButton(
+            text = "添加",
             onClick = {
-                onSubmit(formState.userName.value, formState.key.value)
-            }
-        ) {
-            Text(
-                text = "添加",
-                color = MiuixTheme.colorScheme.primary
-            )
-        }
+                onSubmit(formState.key.value)
+            },
+            colors = ButtonDefaults.textButtonColorsPrimary()
+        )
     }
 }
 
@@ -135,7 +124,7 @@ private fun UsersList(
 ) {
     Text(
         modifier = Modifier.padding(top = 16.dp),
-        text = "用户列表"
+        text = "用户列表（共${users.size}个账号）"
     )
     LazyColumn(
         modifier = Modifier.padding(top = 8.dp)
@@ -152,11 +141,40 @@ private fun UserListItem(
     user: User,
     onDelete: () -> Unit
 ) {
-    var isKeyVisible by remember { mutableStateOf(false) }
+    var isKeyVisible = remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var verificationResult by remember { mutableStateOf<Boolean?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
+    LaunchedEffect(Unit) {
+        val response = getCustomerInfo(user.key)
+        if (response.code != 200) {
+            verificationResult = false
+        }
+    }
+
+    SuperDialog(
+        modifier = Modifier,
+        show = isKeyVisible,
+        onDismissRequest = { isKeyVisible.value = false },
+        title = "请勿泄露本KEY",
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            SelectionContainer {
+                Text(user.key)
+            }
+        }
+        TextButton(
+            text = "确定",
+            onClick = { isKeyVisible.value = false },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp),
+            colors = ButtonDefaults.textButtonColorsPrimary()
+        )
+    }
     Row(
         Modifier
             .fillMaxWidth()
@@ -167,10 +185,13 @@ private fun UserListItem(
         Column(Modifier.weight(1f)) {
             Text(user.name)
             Text(
-                if (isKeyVisible) user.key else "点击显示Key",
+                text = "点击显示Key",
                 color = Color.Gray,
+                maxLines = 1,
                 modifier = Modifier
-                    .clickable { isKeyVisible = !isKeyVisible }
+                    .clickable {
+                        isKeyVisible.value = true
+                    }
                     .padding(top = 4.dp),
             )
         }
@@ -179,95 +200,73 @@ private fun UserListItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (isLoading) {
+
+            AnimatedVisibility(
+                visible = isLoading,
+            ) {
                 InfiniteProgressIndicator(
                     modifier = Modifier.padding(8.dp),
                     color = MiuixTheme.colorScheme.primary
                 )
             }
-            verificationResult?.let { result ->
-                Text(
-                    text = if (result) "未失效" else "已失效",
-                    color = if (result) Color(74, 109, 66) else Color(168, 62, 76),
-                    modifier = Modifier.padding(top = 4.dp).clickable {
+            AnimatedVisibility(
+                visible = verificationResult != null
+            ) {
+                verificationResult?.let {
+                    Text(
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .clickable {
+                                verificationResult = null
+                            },
+                        text = if (it) "有效" else "失效",
+                        color = if (it) Color(74, 109, 66) else Color(168, 62, 76),
+                    )
+                    LaunchedEffect(Unit) {
+                        if (!it) return@LaunchedEffect
+                        delay(10000)
                         verificationResult = null
                     }
-                )
-                LaunchedEffect(Unit) {
-                    if (verificationResult == false) return@LaunchedEffect
-                    delay(10000)
-                    verificationResult = null
                 }
             }
-            Button(
+            TextButton(
+                text = "验证",
                 onClick = {
                     isLoading = true
+                    verificationResult = null
                     coroutineScope.launch {
-                        try {
-                            val response = getCustomerInfo(user.key)
-                            verificationResult = response.code == 200
-                        } finally {
-                            isLoading = false
-                        }
+                        val response = getCustomerInfo(user.key)
+                        verificationResult = response.code == 200
+                        isLoading = false
                     }
                 }
-            ) {
-                Text(
-                    text = "验证",
-                    color = MiuixTheme.colorScheme.primary
-                )
-            }
+            )
 
-            Button(
+            TextButton(
+                text = "删除",
                 onClick = onDelete
-            ) {
-                Text(
-                    text = "删除",
-                    color = MiuixTheme.colorScheme.primary
-                )
-            }
+            )
         }
     }
 }
 
 private suspend fun handleUserSubmission(
     repository: UserDao,
-    userName: String,
     key: String,
     formState: FormState,
     onError: () -> Unit
 ) {
     when {
-        userName.isBlank() -> {
-            formState.apply {
-                this.userName.value = userName
-                this.key.value = key
-                isError.value = true
-                errorType.value = UserInputErrorEnum.EMPTY_NAME
-            }
-        }
-
         key.isBlank() -> {
             formState.apply {
-                this.userName.value = userName
                 this.key.value = key
                 isError.value = true
                 errorType.value = UserInputErrorEnum.EMPTY_KEY
             }
         }
 
-        repository.existUserByName(userName) -> {
-            formState.apply {
-                this.userName.value = userName
-                this.key.value = key
-                isError.value = true
-                errorType.value = UserInputErrorEnum.REPEAT_NAME
-            }
-        }
-
         repository.existUserByKey(key) -> {
             formState.apply {
-                this.userName.value = userName
                 this.key.value = key
                 isError.value = true
                 errorType.value = UserInputErrorEnum.REPEAT_KEY
@@ -275,12 +274,20 @@ private suspend fun handleUserSubmission(
         }
 
         else -> {
-            val user = User(name = userName, key = key)
             val response = getCustomerInfo(key)
             if (response.code == 200) {
+                val nickName = response.result?.nickName ?: "未知用户"
+                if (repository.existUserByName(nickName)) {
+                    formState.apply {
+                        this.key.value = key
+                        isError.value = true
+                        errorType.value = UserInputErrorEnum.REPEAT_NAME
+                    }
+                    return
+                }
+                val user = User(name = nickName, key = key)
                 repository.insertUser(user)
                 formState.apply {
-                    this.userName.value = ""
                     this.key.value = ""
                     isError.value = false
                     errorType.value = UserInputErrorEnum.NONE

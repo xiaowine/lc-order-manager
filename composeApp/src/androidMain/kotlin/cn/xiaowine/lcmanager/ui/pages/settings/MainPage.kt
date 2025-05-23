@@ -1,47 +1,53 @@
 package cn.xiaowine.lcmanager.ui.pages.settings
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavHostController
 import cn.xiaowine.lcmanager.data.database.AndroidDatabaseFactory
+import cn.xiaowine.lcmanager.data.database.UserDatabase
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationItem
-import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 
 @Composable
-actual fun MainPage() {
+actual fun HomeTopBar(navController: NavHostController) {
+    Column {
+        SmallTopAppBar(
+            title = "标题",
+        )
+        HorizontalDivider()
+    }
 
+}
+
+@Composable
+actual fun HomeContent(navController: NavHostController, padding: PaddingValues): Pair<UserDatabase, PaddingValues> {
     val context = LocalContext.current
-
-    var selectedIndex by remember { mutableIntStateOf(0) }
-
     val repository = remember {
         AndroidDatabaseFactory(context).createDatabase()
             .build()
-            .userDao()
     }
+    return repository to padding
+}
 
-    Scaffold(
-        topBar = {
-            SmallTopAppBar(
-                title = "标题",
-            )
+@Composable
+actual fun HomeBottomBar(navController: NavHostController) {
+    var selectedIndex by remember { mutableIntStateOf(0) }
+    NavigationBar(
+        items = settingsMenuItems.map {
+            NavigationItem(it.name, it.icon)
         },
-        content = { padding ->
-            NavPage(repository, padding)
+        selected = selectedIndex,
+        onClick = {
+            selectedIndex = it
+            navController.navigate(settingsMenuItems[selectedIndex].route)
         },
-        bottomBar = {
-            NavigationBar(
-                items = settingsMenuItems.map {
-                    NavigationItem(it.first, it.second)
-                },
-                selected = selectedIndex,
-                onClick = { selectedIndex = it }
-            )
-        }
     )
 }

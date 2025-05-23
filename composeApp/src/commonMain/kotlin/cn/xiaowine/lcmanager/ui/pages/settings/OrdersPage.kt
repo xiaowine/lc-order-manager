@@ -1,0 +1,650 @@
+package cn.xiaowine.lcmanager.ui.pages.settings
+
+import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
+import cn.xiaowine.lcmanager.data.database.UserDatabase
+import cn.xiaowine.lcmanager.data.entity.Product
+import cn.xiaowine.lcmanager.data.entity.User
+import cn.xiaowine.lcmanager.data.network.OrderApi.getOrderList
+import cn.xiaowine.lcmanager.data.network.OrderApi.getOrderPart
+import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.*
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.icons.basic.*
+import top.yukonga.miuix.kmp.icon.icons.useful.Refresh
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.SmoothRoundedCornerShape
+
+/**
+ * 订单页面主组件
+ *
+ * @param repository 数据库仓库
+ * @param padding 页面内边距
+ */
+@Composable
+fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
+    val coroutineScope = rememberCoroutineScope()
+    val products = repository.productDao().getAllProducts().collectAsState(initial = emptyList())
+    val users = repository.userDao().getAllUsers().collectAsState(initial = emptyList())
+
+    // 搜索和过滤状态
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedBrand by remember { mutableStateOf<String?>(null) }
+    var selectedModel by remember { mutableStateOf<String?>(null) }
+    var selectedEncap by remember { mutableStateOf<String?>(null) }
+    var selectedCatalog by remember { mutableStateOf<String?>(null) }
+
+
+    // 获取所有可用的分类选项
+    val availableBrands = remember(products.value) { products.value.map { it.brandName }.distinct().sorted() }
+    val availableModels = remember(products.value) { products.value.map { it.productModel }.distinct().sorted() }
+    val availableEncaps = remember(products.value) { products.value.map { it.encapStandard }.distinct().sorted() }
+    val availableCatalogs = remember(products.value) { products.value.map { it.catalogName }.distinct().sorted() }
+
+    // 过滤产品
+    val filteredProducts = remember(products.value, searchQuery, selectedBrand, selectedModel, selectedEncap, selectedCatalog) {
+        products.value.filter { product ->
+            val matchesSearch = searchQuery.isEmpty() ||
+                    product.productName.contains(searchQuery, ignoreCase = true) ||
+                    product.productModel.contains(searchQuery, ignoreCase = true)
+            val matchesBrand = selectedBrand == null || product.brandName == selectedBrand
+            val matchesModel = selectedModel == null || product.productModel == selectedModel
+            val matchesEncap = selectedEncap == null || product.encapStandard == selectedEncap
+            val matchesCatalog = selectedCatalog == null || product.catalogName == selectedCatalog
+            matchesSearch && matchesBrand && matchesModel && matchesEncap && matchesCatalog
+        }
+    }
+
+    // 按订单分组过滤后的产品
+    val groupedProducts = remember(filteredProducts) {
+        filteredProducts.groupBy { it.orderCode }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+
+            // 统计卡片
+            DataCard(
+                orderCount = groupedProducts.size,
+                itemCount = filteredProducts.size,
+            )
+            SearchBar(
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .padding(top = 24.dp),
+
+                )
+
+            // 过滤器
+            FilterSection(
+                availableBrands = availableBrands,
+                availableModels = availableModels,
+                availableEncaps = availableEncaps,
+                availableCatalogs = availableCatalogs,
+                selectedBrand = selectedBrand,
+                selectedModel = selectedModel,
+                selectedEncap = selectedEncap,
+                selectedCatalog = selectedCatalog,
+                onFilterSelected = { type, value ->
+                    when (type) {
+                        "brand" -> selectedBrand = value
+                        "model" -> selectedModel = value
+                        "encap" -> selectedEncap = value
+                        "catalog" -> selectedCatalog = value
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .padding(top = 16.dp)
+            )
+
+
+            // 产品列表
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .padding(top = 16.dp)
+            ) {
+                items(groupedProducts.toList()) { (orderCode, products) ->
+                    OrderItemFromProducts(orderCode = orderCode, products = products)
+                }
+            }
+        }
+
+        RefreshIcon(
+            modifier = Modifier
+                .padding(padding)
+                .align(Alignment.BottomEnd),
+            onRefresh = {
+                coroutineScope.launch {
+                    fetchOrderData(repository, users.value)
+                }
+            }
+        )
+    }
+}
+
+/**
+ * 搜索栏组件
+ *
+ * @param searchQuery 搜索关键词
+ * @param onSearchQueryChange 搜索关键词变化回调
+ * @param modifier 组件修饰符
+ */
+@Composable
+private fun SearchBar(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .clip(SmoothRoundedCornerShape(12.dp))
+            .background(MiuixTheme.colorScheme.surface)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = MiuixIcons.Basic.Search,
+            contentDescription = "搜索",
+            tint = MiuixTheme.colorScheme.onSurfaceVariantActions
+        )
+        BasicTextField(
+            value = searchQuery,
+            onValueChange = onSearchQueryChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 8.dp),
+            textStyle = MiuixTheme.textStyles.body1.copy(
+                color = MiuixTheme.colorScheme.onSurface
+            ),
+            decorationBox = { innerTextField ->
+                Box {
+                    if (searchQuery.isEmpty()) {
+                        Text(
+                            text = "搜索器件...",
+                            style = MiuixTheme.textStyles.body1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                        )
+                    }
+                    innerTextField()
+                }
+            }
+        )
+    }
+}
+
+/**
+ * 筛选器区域组件
+ *
+ * @param availableBrands 可用品牌列表
+ * @param availableModels 可用型号列表
+ * @param availableEncaps 可用封装列表
+ * @param availableCatalogs 可用目录列表
+ * @param selectedBrand 已选品牌
+ * @param selectedModel 已选型号
+ * @param selectedEncap 已选封装
+ * @param selectedCatalog 已选目录
+ * @param onFilterSelected 筛选器选择回调 (type: String, value: String?) -> Unit
+ * @param modifier 组件修饰符
+ */
+@Composable
+private fun FilterSection(
+    availableBrands: List<String>,
+    availableModels: List<String>,
+    availableEncaps: List<String>,
+    availableCatalogs: List<String>,
+    selectedBrand: String?,
+    selectedModel: String?,
+    selectedEncap: String?,
+    selectedCatalog: String?,
+    onFilterSelected: (String, String?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expandedFilter by remember { mutableStateOf<String?>(null) }
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        FilterChip(
+            selected = selectedBrand != null,
+            onClick = {
+                expandedFilter = if (expandedFilter == "brand") null else "brand"
+            },
+            label = selectedBrand ?: "品牌",
+            modifier = Modifier.weight(1f)
+        )
+        FilterChip(
+            selected = selectedModel != null,
+            onClick = {
+                expandedFilter = if (expandedFilter == "model") null else "model"
+            },
+            label = selectedModel ?: "型号",
+            modifier = Modifier.weight(1f)
+        )
+        FilterChip(
+            selected = selectedEncap != null,
+            onClick = {
+                expandedFilter = if (expandedFilter == "encap") null else "encap"
+            },
+            label = selectedEncap ?: "封装",
+            modifier = Modifier.weight(1f)
+        )
+        FilterChip(
+            selected = selectedCatalog != null,
+            onClick = {
+                expandedFilter = if (expandedFilter == "catalog") null else "catalog"
+            },
+            label = selectedCatalog ?: "目录",
+            modifier = Modifier.weight(1f)
+        )
+    }
+
+    AnimatedVisibility(
+        visible = expandedFilter != null,
+        enter = expandVertically() + fadeIn(),
+        exit = shrinkVertically() + fadeOut()
+    ) {
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            item {
+                FilterChip(
+                    selected = false,
+                    onClick = {
+                        if (expandedFilter != null) {
+                            onFilterSelected(expandedFilter!!, null)
+                        }
+                    },
+                    label = "全部"
+                )
+            }
+
+            when (expandedFilter) {
+                "brand" -> items(availableBrands) { brand ->
+                    FilterChip(
+                        selected = brand == selectedBrand,
+                        onClick = { onFilterSelected("brand", brand) },
+                        label = brand
+                    )
+                }
+
+                "model" -> items(availableModels) { model ->
+                    FilterChip(
+                        selected = model == selectedModel,
+                        onClick = { onFilterSelected("model", model) },
+                        label = model
+                    )
+                }
+
+                "encap" -> items(availableEncaps) { encap ->
+                    FilterChip(
+                        selected = encap == selectedEncap,
+                        onClick = { onFilterSelected("encap", encap) },
+                        label = encap
+                    )
+                }
+
+                "catalog" -> items(availableCatalogs) { catalog ->
+                    FilterChip(
+                        selected = catalog == selectedCatalog,
+                        onClick = { onFilterSelected("catalog", catalog) },
+                        label = catalog
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 筛选器标签组件
+ *
+ * @param selected 是否选中
+ * @param onClick 点击回调
+ * @param label 标签文本
+ * @param modifier 组件修饰符
+ */
+@Composable
+private fun FilterChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(SmoothRoundedCornerShape(8.dp))
+            .background(
+                if (selected) MiuixTheme.colorScheme.primary.copy(alpha = 0.1f)
+                else MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.1f)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = label,
+            style = MiuixTheme.textStyles.body2,
+            color = if (selected) MiuixTheme.colorScheme.primary
+            else MiuixTheme.colorScheme.onSurfaceVariantActions
+        )
+    }
+}
+
+/**
+ * 订单商品项组件
+ *
+ * @param orderCode 订单编号
+ * @param products 商品列表
+ */
+@Composable
+fun OrderItemFromProducts(orderCode: String, products: List<Product>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "订单编号",
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantActions
+            )
+            Text(
+                text = orderCode,
+                style = MiuixTheme.textStyles.body1
+            )
+        }
+
+        products.forEach { product ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "${product.catalogName}:${product.productModel}",
+                    style = MiuixTheme.textStyles.body2
+                )
+                Text(
+                    text = "×${product.purchaseNumber}",
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 刷新按钮组件
+ *
+ * @param modifier 组件修饰符
+ * @param onRefresh 刷新回调
+ */
+@Composable
+fun RefreshIcon(
+    modifier: Modifier,
+    onRefresh: () -> Unit
+) {
+    IconButton(
+        modifier = modifier
+            .padding(24.dp)
+            .shadow(elevation = 4.dp, SmoothRoundedCornerShape(15.dp))
+            .clip(SmoothRoundedCornerShape(15.dp))
+            .background(MiuixTheme.colorScheme.background)
+            .border(
+                width = 0.75.dp,
+                color = MiuixTheme.colorScheme.dividerLine,
+                shape = SmoothRoundedCornerShape(15.dp)
+            ),
+        onClick = onRefresh
+    ) {
+        Icon(
+            imageVector = MiuixIcons.Useful.Refresh,
+            contentDescription = "刷新"
+        )
+    }
+}
+
+/**
+ * 数据统计卡片组件
+ *
+ * @param orderCount 订单数量
+ * @param itemCount 商品数量
+ * @param modifier 组件修饰符
+ */
+@Composable
+private fun DataCard(
+    orderCount: Int,
+    itemCount: Int,
+    modifier: Modifier = Modifier
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+    val rotationState by animateFloatAsState(targetValue = if (isExpanded) 0f else -180f)
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp)
+            .padding(top = 24.dp)
+            .clip(SmoothRoundedCornerShape(12.dp))
+            .background(MiuixTheme.colorScheme.surface)
+            .clickable { isExpanded = !isExpanded }
+    ) {
+        // Header section with arrow
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "统计信息",
+                style = MiuixTheme.textStyles.title2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantActions
+            )
+            Icon(
+                imageVector = MiuixIcons.Basic.ArrowUpDown,
+                contentDescription = "展开/收起",
+                modifier = Modifier.graphicsLayer {
+                    rotationZ = rotationState
+                },
+                tint = MiuixTheme.colorScheme.onSurfaceVariantActions
+            )
+        }
+
+        // Expandable content
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                // 订单数统计
+                StatisticItem(
+                    value = orderCount.toString(),
+                    label = "订单数"
+                )
+
+                // 元件数统计
+                StatisticItem(
+                    value = itemCount.toString(),
+                    label = "元件数"
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 统计数据项组件
+ *
+ * @param value 数值
+ * @param label 标签
+ * @param modifier 组件修饰符
+ */
+@Composable
+private fun StatisticItem(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .clip(SmoothRoundedCornerShape(8.dp))
+            .background(MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.1f))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+
+        Column {
+            Text(
+                text = value,
+                style = MiuixTheme.textStyles.title1,
+                color = MiuixTheme.colorScheme.primary
+            )
+            Text(
+                text = label,
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceContainerVariant,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+    }
+}
+
+/**
+ * 刷新数据的异步函数
+ * 功能：获取所有用户的订单数据并更新到数据库
+ * 步骤：
+ * 1. 清理旧数据
+ * 2. 遍历每个用户获取订单列表
+ * 3. 获取每个订单的详细信息
+ * 4. 保存到数据库
+ *
+ * @param repository 数据库仓库
+ * @param users 用户列表
+ */
+private suspend fun fetchOrderData(
+    repository: UserDatabase,
+    users: List<User>
+) {
+    println("Start refreshing order data")
+
+    try {
+        // 1. Clear all existing product data
+        println("Cleaning old data...")
+        repository.productDao().deleteAllProducts()
+
+        var totalOrderCount = 0
+        var processedOrderCount = 0
+
+        // 2. Fetch new data for each user
+        users.forEach { user ->
+            println("Processing user: ${user.name}")
+
+            // Get first page and total pages
+            val firstPage = getOrderList(user.key)
+            if (firstPage.code != 200) {
+                println("Failed to get user order list, status code: ${firstPage.code}")
+                return@forEach
+            }
+
+            val totalPages = firstPage.result!!.totalPage
+            println("Total pages: $totalPages")
+
+            // Process all pages
+            for (page in 1..totalPages) {
+                println("Fetching page $page")
+                val orderList = getOrderList(user.key, currPage = page)
+
+                // Count total orders for verification
+                totalOrderCount += orderList.result?.dataList?.size ?: 0
+
+                // Process each order
+                orderList.result?.dataList?.forEach { data ->
+                    println("Getting order details: ${data.orderCode}")
+                    val orderPart = getOrderPart(user.key, data.uuid)
+
+                    if (orderPart.code == 200) {
+
+                        // Process each product in the order
+                        val products = orderPart.result!!.szProductList.ifEmpty { orderPart.result.jsProductList }
+                        products.forEach { detail ->
+                            processedOrderCount++
+                            // Create product even if purchaseNumber is null, it will be set to 0
+                            val product = Product(
+                                brandName = detail.brandName ?: "",
+                                productCode = detail.productCode ?: "",
+                                breviaryImageUrl = detail.breviaryImageUrl ?: "",
+                                catalogName = detail.catalogName ?: "",
+                                encapStandard = detail.encapStandard ?: "",
+                                productModel = detail.productModel ?: "",
+                                productName = detail.productName ?: "",
+                                productPrice = detail.productPrice ?: 0.0,
+                                purchaseNumber = detail.purchaseNumber,
+                                stockUnit = detail.stockUnit ?: "",
+                                uuid = detail.uuid ?: "",
+                                orderCode = data.orderCode,
+                                orderUuid = data.uuid,
+                                orderTime = data.orderTime
+                            )
+                            repository.productDao().insertProduct(product)
+                            println("Inserted product: ${product.productName}")
+                        }
+                    } else {
+                        println("Failed to get order details for ${data.orderCode}, status code: ${orderPart.code}")
+                    }
+                }
+            }
+        }
+
+        println("Data refresh completed")
+        println("Total orders found: $totalOrderCount")
+        println("Successfully processed orders: $processedOrderCount")
+    } catch (e: Exception) {
+        println("Error refreshing data: ${e.message}")
+        e.printStackTrace()
+    }
+}

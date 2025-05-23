@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class InfoData(
     val code: Int = 0,
-    val msg: String? = null,
+    val msg: String?,
     val result: InfoDataResult? = null
 )
 
