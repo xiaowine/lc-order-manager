@@ -16,8 +16,8 @@ data class PageData(
 
 val settingsMenuItems = listOf(
     PageData("订单", MiuixIcons.Useful.NavigatorSwitch, "orders"),
+    PageData("统计", MiuixIcons.Useful.NavigatorSwitch, "counts"),
     PageData("用户", MiuixIcons.Useful.NavigatorSwitch, "users"),
-    PageData("其他", MiuixIcons.Useful.NavigatorSwitch, "other"),
 )
 
 @Composable

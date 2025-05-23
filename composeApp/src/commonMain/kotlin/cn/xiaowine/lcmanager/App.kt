@@ -64,6 +64,9 @@ fun NavGraphBuilder.pageDestinations(
     composable("users") {
         SettingsUsersPage(userDatabase.userDao(), padding)
     }
+    composable("counts") {
+        OrdersPage(userDatabase, padding)
+    }
     composable("orders") {
         OrdersPage(userDatabase, padding)
     }

@@ -1,21 +1,40 @@
 package cn.xiaowine.lcmanager.ui.pages.settings
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import cn.xiaowine.lcmanager.data.database.UserDatabase
 import cn.xiaowine.lcmanager.data.entity.Product
@@ -23,9 +42,14 @@ import cn.xiaowine.lcmanager.data.entity.User
 import cn.xiaowine.lcmanager.data.network.OrderApi.getOrderList
 import cn.xiaowine.lcmanager.data.network.OrderApi.getOrderPart
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.*
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.extra.SuperDialog
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.icons.basic.*
+import top.yukonga.miuix.kmp.icon.icons.basic.ArrowUpDown
+import top.yukonga.miuix.kmp.icon.icons.basic.Search
 import top.yukonga.miuix.kmp.icon.icons.useful.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.SmoothRoundedCornerShape
@@ -42,6 +66,8 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
     val products = repository.productDao().getAllProducts().collectAsState(initial = emptyList())
     val users = repository.userDao().getAllUsers().collectAsState(initial = emptyList())
 
+    var isLoadDialogVisible = remember { mutableStateOf(false) }
+
     // 搜索和过滤状态
     var searchQuery by remember { mutableStateOf("") }
     var selectedBrand by remember { mutableStateOf<String?>(null) }
@@ -49,15 +75,8 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
     var selectedEncap by remember { mutableStateOf<String?>(null) }
     var selectedCatalog by remember { mutableStateOf<String?>(null) }
 
-
-    // 获取所有可用的分类选项
-    val availableBrands = remember(products.value) { products.value.map { it.brandName }.distinct().sorted() }
-    val availableModels = remember(products.value) { products.value.map { it.productModel }.distinct().sorted() }
-    val availableEncaps = remember(products.value) { products.value.map { it.encapStandard }.distinct().sorted() }
-    val availableCatalogs = remember(products.value) { products.value.map { it.catalogName }.distinct().sorted() }
-
     // 过滤产品
-    val filteredProducts = remember(products.value, searchQuery, selectedBrand, selectedModel, selectedEncap, selectedCatalog) {
+    val filteredProducts = remember(products.value, searchQuery) {
         products.value.filter { product ->
             val matchesSearch = searchQuery.isEmpty() ||
                     product.productName.contains(searchQuery, ignoreCase = true) ||
@@ -97,31 +116,6 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
 
                 )
 
-            // 过滤器
-            FilterSection(
-                availableBrands = availableBrands,
-                availableModels = availableModels,
-                availableEncaps = availableEncaps,
-                availableCatalogs = availableCatalogs,
-                selectedBrand = selectedBrand,
-                selectedModel = selectedModel,
-                selectedEncap = selectedEncap,
-                selectedCatalog = selectedCatalog,
-                onFilterSelected = { type, value ->
-                    when (type) {
-                        "brand" -> selectedBrand = value
-                        "model" -> selectedModel = value
-                        "encap" -> selectedEncap = value
-                        "catalog" -> selectedCatalog = value
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-                    .padding(top = 16.dp)
-            )
-
-
             // 产品列表
             LazyColumn(
                 modifier = Modifier
@@ -141,10 +135,41 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
                 .align(Alignment.BottomEnd),
             onRefresh = {
                 coroutineScope.launch {
-                    fetchOrderData(repository, users.value)
+                    fetchOrderData(repository, users.value, isLoadDialogVisible)
                 }
             }
         )
+    }
+
+    SuperDialog(
+        modifier = Modifier,
+        show = isLoadDialogVisible,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "正在缓存最新订单数据...",
+                style = MiuixTheme.textStyles.body1,
+                color = MiuixTheme.colorScheme.onSurface
+            )
+
+            InfiniteProgressIndicator(
+                modifier = Modifier.size(48.dp)
+            )
+
+            Text(
+                text = "请耐心等待，数据加载过程可能需要几分钟",
+                style = MiuixTheme.textStyles.subtitle,
+                color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                textAlign = TextAlign.Center
+            )
+
+        }
     }
 }
 
@@ -182,6 +207,7 @@ private fun SearchBar(
             textStyle = MiuixTheme.textStyles.body1.copy(
                 color = MiuixTheme.colorScheme.onSurface
             ),
+            singleLine = true,
             decorationBox = { innerTextField ->
                 Box {
                     if (searchQuery.isEmpty()) {
@@ -198,166 +224,6 @@ private fun SearchBar(
     }
 }
 
-/**
- * 筛选器区域组件
- *
- * @param availableBrands 可用品牌列表
- * @param availableModels 可用型号列表
- * @param availableEncaps 可用封装列表
- * @param availableCatalogs 可用目录列表
- * @param selectedBrand 已选品牌
- * @param selectedModel 已选型号
- * @param selectedEncap 已选封装
- * @param selectedCatalog 已选目录
- * @param onFilterSelected 筛选器选择回调 (type: String, value: String?) -> Unit
- * @param modifier 组件修饰符
- */
-@Composable
-private fun FilterSection(
-    availableBrands: List<String>,
-    availableModels: List<String>,
-    availableEncaps: List<String>,
-    availableCatalogs: List<String>,
-    selectedBrand: String?,
-    selectedModel: String?,
-    selectedEncap: String?,
-    selectedCatalog: String?,
-    onFilterSelected: (String, String?) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var expandedFilter by remember { mutableStateOf<String?>(null) }
-
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        FilterChip(
-            selected = selectedBrand != null,
-            onClick = {
-                expandedFilter = if (expandedFilter == "brand") null else "brand"
-            },
-            label = selectedBrand ?: "品牌",
-            modifier = Modifier.weight(1f)
-        )
-        FilterChip(
-            selected = selectedModel != null,
-            onClick = {
-                expandedFilter = if (expandedFilter == "model") null else "model"
-            },
-            label = selectedModel ?: "型号",
-            modifier = Modifier.weight(1f)
-        )
-        FilterChip(
-            selected = selectedEncap != null,
-            onClick = {
-                expandedFilter = if (expandedFilter == "encap") null else "encap"
-            },
-            label = selectedEncap ?: "封装",
-            modifier = Modifier.weight(1f)
-        )
-        FilterChip(
-            selected = selectedCatalog != null,
-            onClick = {
-                expandedFilter = if (expandedFilter == "catalog") null else "catalog"
-            },
-            label = selectedCatalog ?: "目录",
-            modifier = Modifier.weight(1f)
-        )
-    }
-
-    AnimatedVisibility(
-        visible = expandedFilter != null,
-        enter = expandVertically() + fadeIn(),
-        exit = shrinkVertically() + fadeOut()
-    ) {
-        LazyRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            item {
-                FilterChip(
-                    selected = false,
-                    onClick = {
-                        if (expandedFilter != null) {
-                            onFilterSelected(expandedFilter!!, null)
-                        }
-                    },
-                    label = "全部"
-                )
-            }
-
-            when (expandedFilter) {
-                "brand" -> items(availableBrands) { brand ->
-                    FilterChip(
-                        selected = brand == selectedBrand,
-                        onClick = { onFilterSelected("brand", brand) },
-                        label = brand
-                    )
-                }
-
-                "model" -> items(availableModels) { model ->
-                    FilterChip(
-                        selected = model == selectedModel,
-                        onClick = { onFilterSelected("model", model) },
-                        label = model
-                    )
-                }
-
-                "encap" -> items(availableEncaps) { encap ->
-                    FilterChip(
-                        selected = encap == selectedEncap,
-                        onClick = { onFilterSelected("encap", encap) },
-                        label = encap
-                    )
-                }
-
-                "catalog" -> items(availableCatalogs) { catalog ->
-                    FilterChip(
-                        selected = catalog == selectedCatalog,
-                        onClick = { onFilterSelected("catalog", catalog) },
-                        label = catalog
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * 筛选器标签组件
- *
- * @param selected 是否选中
- * @param onClick 点击回调
- * @param label 标签文本
- * @param modifier 组件修饰符
- */
-@Composable
-private fun FilterChip(
-    selected: Boolean,
-    onClick: () -> Unit,
-    label: String,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .clip(SmoothRoundedCornerShape(8.dp))
-            .background(
-                if (selected) MiuixTheme.colorScheme.primary.copy(alpha = 0.1f)
-                else MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.1f)
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
-        Text(
-            text = label,
-            style = MiuixTheme.textStyles.body2,
-            color = if (selected) MiuixTheme.colorScheme.primary
-            else MiuixTheme.colorScheme.onSurfaceVariantActions
-        )
-    }
-}
 
 /**
  * 订单商品项组件
@@ -399,7 +265,8 @@ fun OrderItemFromProducts(orderCode: String, products: List<Product>) {
                     style = MiuixTheme.textStyles.body2
                 )
                 Text(
-                    text = "×${product.purchaseNumber}",
+                    text = "${product.productPrice} ×${product.purchaseNumber} = " +
+                            "${String.format("%.2f", product.productPrice * product.purchaseNumber)}元",
                     style = MiuixTheme.textStyles.body2,
                     color = MiuixTheme.colorScheme.primary
                 )
@@ -568,11 +435,13 @@ private fun StatisticItem(
  */
 private suspend fun fetchOrderData(
     repository: UserDatabase,
-    users: List<User>
+    users: List<User>,
+    isKeyVisible: MutableState<Boolean>
 ) {
     println("Start refreshing order data")
 
     try {
+        isKeyVisible.value = true
         // 1. Clear all existing product data
         println("Cleaning old data...")
         repository.productDao().deleteAllProducts()
@@ -647,4 +516,5 @@ private suspend fun fetchOrderData(
         println("Error refreshing data: ${e.message}")
         e.printStackTrace()
     }
+    isKeyVisible.value = false
 }
