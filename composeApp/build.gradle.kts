@@ -57,11 +57,11 @@ android {
     val localProperties = org.jetbrains.kotlin.konan.properties.Properties()
     if (rootProject.file("local.properties").canRead()) localProperties.load(rootProject.file("local.properties").inputStream())
 
-    namespace = "org.example.project"
+    namespace = "cn.xiaowine.lcmanager"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "org.example.project"
+        applicationId = "cn.xiaowine.lcmanager"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
@@ -102,7 +102,7 @@ android {
 }
 
 dependencies {
-    debugImplementation(compose.uiTooling)
+//    debugImplementation(compose.uiTooling)
     add("kspAndroid", libs.androidx.room.compiler)
     add("kspDesktop", libs.androidx.room.compiler)
 }
@@ -113,7 +113,7 @@ room {
 
 compose.desktop {
     application {
-        mainClass = "org.example.project.MainKt"
+        mainClass = "cn.xiaowine.lcmanager.MainKt"
         buildTypes.release.proguard {
             optimize = false
             configurationFiles.from("proguard-rules-jvm.pro")
@@ -121,13 +121,13 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "org.example.project"
+            packageName = "cn.xiaowine.lcmanager"
             packageVersion = "1.0.0"
 
             windows {
                 dirChooser = true
-                upgradeUuid = "8bc27e26-9f65-4aa6-bb63-f421a7170bb7"
-                menuGroup = "Project"
+                upgradeUuid = "8a872d8e-e346-47dc-bd25-030b678231f8"
+                menuGroup = "LcManager"
                 perUserInstall = true
             }
         }

@@ -17,13 +17,13 @@ jobs:
             platform: windows x64
             build-command: ./gradlew createReleaseDistributable
             artifact-path: composeApp/build/compose/binaries/main-release/app
-            artifact-name: project-windows-x64
+            artifact-name: windows-x64
 
           - os: ubuntu-latest
             platform: android aarch64
             build-command: ./gradlew assembleRelease
             artifact-path: composeApp/build/outputs/apk/release
-            artifact-name: project-android-aarch64
+            artifact-name: android-aarch64
 
     steps:
       - name: Checkout sources
