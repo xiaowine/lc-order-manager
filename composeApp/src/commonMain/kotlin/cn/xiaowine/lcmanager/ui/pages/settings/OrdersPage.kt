@@ -71,10 +71,6 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
 
     // 搜索和过滤状态
     var searchQuery by remember { mutableStateOf("") }
-    var selectedBrand by remember { mutableStateOf<String?>(null) }
-    var selectedModel by remember { mutableStateOf<String?>(null) }
-    var selectedEncap by remember { mutableStateOf<String?>(null) }
-    var selectedCatalog by remember { mutableStateOf<String?>(null) }
 
     // 过滤产品
     val filteredProducts = remember(products.value, searchQuery) {
@@ -82,11 +78,7 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
             val matchesSearch = searchQuery.isEmpty() ||
                     product.productName.contains(searchQuery, ignoreCase = true) ||
                     product.productModel.contains(searchQuery, ignoreCase = true)
-            val matchesBrand = selectedBrand == null || product.brandName == selectedBrand
-            val matchesModel = selectedModel == null || product.productModel == selectedModel
-            val matchesEncap = selectedEncap == null || product.encapStandard == selectedEncap
-            val matchesCatalog = selectedCatalog == null || product.catalogName == selectedCatalog
-            matchesSearch && matchesBrand && matchesModel && matchesEncap && matchesCatalog
+            matchesSearch
         }
     }
 
