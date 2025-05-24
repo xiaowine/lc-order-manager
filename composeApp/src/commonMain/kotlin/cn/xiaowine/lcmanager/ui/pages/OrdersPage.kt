@@ -1,4 +1,4 @@
-package cn.xiaowine.lcmanager.ui.pages.settings
+package cn.xiaowine.lcmanager.ui.pages
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
@@ -38,10 +37,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import cn.xiaowine.lcmanager.data.database.UserDatabase
-import cn.xiaowine.lcmanager.data.entity.Product
+import cn.xiaowine.lcmanager.data.entity.OrderProduct
 import cn.xiaowine.lcmanager.data.entity.User
 import cn.xiaowine.lcmanager.data.network.OrderApi.getOrderList
 import cn.xiaowine.lcmanager.data.network.OrderApi.getOrderPart
+import cn.xiaowine.lcmanager.ui.component.SearchBar
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -50,7 +50,6 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.SuperDialog
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.icons.basic.ArrowUpDown
-import top.yukonga.miuix.kmp.icon.icons.basic.Search
 import top.yukonga.miuix.kmp.icon.icons.useful.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.SmoothRoundedCornerShape
@@ -93,12 +92,6 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-
-            // 统计卡片
-            DataCard(
-                orderCount = products.value.groupBy { it.orderCode }.size,
-                itemCount = products.value.size,
-            )
             SearchBar(
                 searchQuery = searchQuery,
                 onSearchQueryChange = { searchQuery = it },
@@ -109,6 +102,12 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
 
                 )
 
+            // 统计卡片
+            DataCard(
+                orderCount = products.value.groupBy { it.orderCode }.size,
+                itemCount = products.value.size,
+            )
+
             // 产品列表
             LazyColumn(
                 modifier = Modifier
@@ -117,7 +116,7 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
                     .padding(top = 16.dp)
             ) {
                 items(groupedProducts.toList()) { (orderCode, products) ->
-                    OrderItemFromProducts(orderCode = orderCode, products = products)
+                    OrderItemFromProducts(orderCode = orderCode, orderProducts = products)
                 }
             }
         }
@@ -167,65 +166,13 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
 }
 
 /**
- * 搜索栏组件
- *
- * @param searchQuery 搜索关键词
- * @param onSearchQueryChange 搜索关键词变化回调
- * @param modifier 组件修饰符
- */
-@Composable
-private fun SearchBar(
-    searchQuery: String,
-    onSearchQueryChange: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .clip(SmoothRoundedCornerShape(12.dp))
-            .background(MiuixTheme.colorScheme.surface)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = MiuixIcons.Basic.Search,
-            contentDescription = "搜索",
-            tint = MiuixTheme.colorScheme.onSurfaceVariantActions
-        )
-        BasicTextField(
-            value = searchQuery,
-            onValueChange = onSearchQueryChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 8.dp),
-            textStyle = MiuixTheme.textStyles.body1.copy(
-                color = MiuixTheme.colorScheme.onSurface
-            ),
-            singleLine = true,
-            decorationBox = { innerTextField ->
-                Box {
-                    if (searchQuery.isEmpty()) {
-                        Text(
-                            text = "搜索器件...",
-                            style = MiuixTheme.textStyles.body1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                        )
-                    }
-                    innerTextField()
-                }
-            }
-        )
-    }
-}
-
-
-/**
  * 订单商品项组件
  *
  * @param orderCode 订单编号
- * @param products 商品列表
+ * @param orderProducts 商品列表
  */
 @Composable
-fun OrderItemFromProducts(orderCode: String, products: List<Product>) {
+fun OrderItemFromProducts(orderCode: String, orderProducts: List<OrderProduct>) {
 
     Column(
         modifier = Modifier
@@ -273,11 +220,11 @@ fun OrderItemFromProducts(orderCode: String, products: List<Product>) {
         )
 
         // 商品列表
-        products.forEachIndexed { index, product ->
+        orderProducts.forEachIndexed { index, product ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = if (index != products.lastIndex) 8.dp else 0.dp),
+                    .padding(vertical = if (index != orderProducts.lastIndex) 8.dp else 0.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -528,7 +475,7 @@ private suspend fun fetchOrderData(
                         products.forEach { detail ->
                             processedOrderCount++
                             // Create product even if purchaseNumber is null, it will be set to 0
-                            val product = Product(
+                            val orderProduct = OrderProduct(
                                 brandName = detail.brandName ?: "",
                                 productCode = detail.productCode ?: "",
                                 breviaryImageUrl = detail.breviaryImageUrl ?: "",
@@ -544,8 +491,8 @@ private suspend fun fetchOrderData(
                                 orderUuid = data.uuid,
                                 orderTime = data.orderTime
                             )
-                            repository.productDao().insertProduct(product)
-                            println("Inserted product: ${product.productName}")
+                            repository.productDao().insertProduct(orderProduct)
+                            println("Inserted product: ${orderProduct.productName}")
                         }
                     } else {
                         println("Failed to get order details for ${data.orderCode}, status code: ${orderPart.code}")

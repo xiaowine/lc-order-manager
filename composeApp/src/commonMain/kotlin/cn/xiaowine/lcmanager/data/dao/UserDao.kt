@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface UserDao {
-    @Query("SELECT * FROM users")
+    @Query("SELECT * FROM ${User.TABLE_NAME}")
     fun getAllUsers(): Flow<List<User>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -15,12 +15,12 @@ interface UserDao {
     @Delete
     suspend fun deleteUser(user: User)
 
-    @Query("SELECT * FROM users WHERE name = :name LIMIT 1")
+    @Query("SELECT * FROM ${User.TABLE_NAME} WHERE name = :name LIMIT 1")
     suspend fun findUserByName(name: String): User?
 
-    @Query("SELECT EXISTS(SELECT 1 FROM users WHERE name = :name)")
+    @Query("SELECT EXISTS(SELECT 1 FROM ${User.TABLE_NAME} WHERE name = :name)")
     suspend fun existUserByName(name: String): Boolean
 
-    @Query("SELECT EXISTS(SELECT 1 FROM users WHERE key = :key)")
-    suspend fun existUserByKey(key: String): Boolean
+    @Query("SELECT EXISTS(SELECT 1 FROM ${User.TABLE_NAME} WHERE `key` = :userKey)")
+    suspend fun existUserByKey(userKey: String): Boolean
 }

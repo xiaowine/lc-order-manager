@@ -1,4 +1,4 @@
-package cn.xiaowine.lcmanager.ui.pages.settings
+package cn.xiaowine.lcmanager.ui.pages
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
@@ -145,13 +145,6 @@ private fun UserListItem(
     var isLoading by remember { mutableStateOf(false) }
     var verificationResult by remember { mutableStateOf<Boolean?>(null) }
     val coroutineScope = rememberCoroutineScope()
-
-    LaunchedEffect(Unit) {
-        val response = getCustomerInfo(user.key)
-        if (response.code != 200) {
-            verificationResult = false
-        }
-    }
 
     SuperDialog(
         modifier = Modifier,

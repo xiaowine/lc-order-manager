@@ -3,9 +3,8 @@ package cn.xiaowine.lcmanager.data.entity
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-
-@Entity(tableName = "products")
-data class Product(
+@Entity(tableName = AllProduct.TABLE_NAME)
+data class AllProduct(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
 
@@ -23,4 +22,8 @@ data class Product(
     val orderCode: String,
     val orderUuid: String,
     val orderTime: String,
-)
+) {
+    companion object {
+        const val TABLE_NAME = "all_product"
+    }
+}

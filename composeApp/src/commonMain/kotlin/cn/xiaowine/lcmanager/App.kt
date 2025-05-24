@@ -10,11 +10,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import cn.xiaowine.lcmanager.data.database.UserDatabase
-import cn.xiaowine.lcmanager.ui.pages.settings.HomeBottomBar
-import cn.xiaowine.lcmanager.ui.pages.settings.HomeContent
-import cn.xiaowine.lcmanager.ui.pages.settings.HomeTopBar
-import cn.xiaowine.lcmanager.ui.pages.settings.OrdersPage
-import cn.xiaowine.lcmanager.ui.pages.settings.SettingsUsersPage
+import cn.xiaowine.lcmanager.ui.pages.CountsPage
+import cn.xiaowine.lcmanager.ui.pages.HomeBottomBar
+import cn.xiaowine.lcmanager.ui.pages.HomeContent
+import cn.xiaowine.lcmanager.ui.pages.HomeTopBar
+import cn.xiaowine.lcmanager.ui.pages.OrdersPage
+import cn.xiaowine.lcmanager.ui.pages.SettingsUsersPage
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -65,7 +66,7 @@ fun NavGraphBuilder.pageDestinations(
         SettingsUsersPage(userDatabase.userDao(), padding)
     }
     composable("counts") {
-        OrdersPage(userDatabase, padding)
+        CountsPage(userDatabase, padding)
     }
     composable("orders") {
         OrdersPage(userDatabase, padding)

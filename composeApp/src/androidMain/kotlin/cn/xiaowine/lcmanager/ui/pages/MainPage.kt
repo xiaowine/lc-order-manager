@@ -1,4 +1,4 @@
-package cn.xiaowine.lcmanager.ui.pages.settings
+package cn.xiaowine.lcmanager.ui.pages
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
