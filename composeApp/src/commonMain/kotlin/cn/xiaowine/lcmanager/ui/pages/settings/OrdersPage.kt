@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -103,8 +104,8 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
 
             // 统计卡片
             DataCard(
-                orderCount = groupedProducts.size,
-                itemCount = filteredProducts.size,
+                orderCount = products.value.groupBy { it.orderCode }.size,
+                itemCount = products.value.size,
             )
             SearchBar(
                 searchQuery = searchQuery,
@@ -233,14 +234,29 @@ private fun SearchBar(
  */
 @Composable
 fun OrderItemFromProducts(orderCode: String, products: List<Product>) {
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .clip(SmoothRoundedCornerShape(16.dp))
+            .background(
+                MiuixTheme.colorScheme.surface
+            )
+            .border(
+                width = 0.75.dp,
+                color = MiuixTheme.colorScheme.dividerLine,
+                shape = SmoothRoundedCornerShape(16.dp)
+            )
             .padding(16.dp)
     ) {
+        // 订单头部信息
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "订单编号",
@@ -249,27 +265,64 @@ fun OrderItemFromProducts(orderCode: String, products: List<Product>) {
             )
             Text(
                 text = orderCode,
-                style = MiuixTheme.textStyles.body1
+                style = MiuixTheme.textStyles.body1.copy(
+                    color = MiuixTheme.colorScheme.primary
+                )
             )
         }
 
-        products.forEach { product ->
+        // 分割线
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+                .height(0.75.dp)
+                .background(MiuixTheme.colorScheme.dividerLine)
+        )
+
+        // 商品列表
+        products.forEachIndexed { index, product ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(vertical = if (index != products.lastIndex) 8.dp else 0.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "${product.catalogName}:${product.productModel}",
-                    style = MiuixTheme.textStyles.body2
-                )
-                Text(
-                    text = "${product.productPrice} ×${product.purchaseNumber} = " +
-                            "${String.format("%.2f", product.productPrice * product.purchaseNumber)}元",
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.primary
-                )
+                Column(
+                    modifier = Modifier
+                        .weight(0.6f)
+                        .padding(end = 16.dp)
+                ) {
+                    Text(
+                        text = product.productModel,
+                        style = MiuixTheme.textStyles.body1,
+                        color = MiuixTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = product.catalogName,
+                        style = MiuixTheme.textStyles.title4,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.weight(0.4f),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Text(
+                        text = "${String.format("%.2f", product.productPrice * product.purchaseNumber)}元",
+                        style = MiuixTheme.textStyles.body1,
+                        color = MiuixTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "${product.productPrice}元 × ${product.purchaseNumber}",
+                        style = MiuixTheme.textStyles.title4,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
             }
         }
     }
