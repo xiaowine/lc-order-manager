@@ -1,8 +1,11 @@
 [versions]
-agp = "8.10.0"
 android-compileSdk = "36"
 android-minSdk = "26"
 android-targetSdk = "36"
+vercode = "1"
+version = "1.0.0"
+
+agp = "8.10.0"
 androidx-activity = "1.10.1"
 androidx-lifecycle = "2.9.0"
 coilNetworkKtor3 = "3.2.0"

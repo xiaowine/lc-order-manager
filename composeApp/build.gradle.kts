@@ -66,8 +66,8 @@ android {
         applicationId = "cn.xiaowine.lcmanager"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = libs.versions.vercode.get().toInt()
+        versionName = libs.versions.version.get()
     }
     val config = localProperties.getProperty("androidStoreFile")?.let {
         signingConfigs.create("release") {
@@ -124,7 +124,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "cn.xiaowine.lcmanager"
-            packageVersion = "1.0.0"
+            packageVersion = libs.versions.version.get()
 
             windows {
                 dirChooser = true
