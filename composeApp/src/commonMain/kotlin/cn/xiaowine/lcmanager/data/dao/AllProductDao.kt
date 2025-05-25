@@ -18,4 +18,7 @@ interface AllProductDao {
 
     @Query("DELETE FROM ${AllProduct.TABLE_NAME}")
     suspend fun deleteAllProducts()
+
+    @Update
+    suspend fun updateProduct(user: AllProduct): Int
 }

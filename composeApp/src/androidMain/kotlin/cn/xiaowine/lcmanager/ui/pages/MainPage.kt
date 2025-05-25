@@ -40,6 +40,10 @@ actual fun HomeContent(navController: NavHostController, padding: PaddingValues)
 @Composable
 actual fun HomeBottomBar(navController: NavHostController) {
     var selectedIndex by remember { mutableIntStateOf(0) }
+    navController.addOnDestinationChangedListener { _, destination, _ ->
+        selectedIndex = settingsMenuItems.indexOfFirst { it.route == destination.route }
+    }
+
     NavigationBar(
         items = settingsMenuItems.map {
             NavigationItem(it.name, it.icon)

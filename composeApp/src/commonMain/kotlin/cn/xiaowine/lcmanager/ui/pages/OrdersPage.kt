@@ -37,12 +37,16 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import cn.xiaowine.lcmanager.data.database.UserDatabase
+import cn.xiaowine.lcmanager.data.entity.AllProduct
 import cn.xiaowine.lcmanager.data.entity.OrderProduct
+import cn.xiaowine.lcmanager.data.entity.ProductInfo
 import cn.xiaowine.lcmanager.data.entity.User
+import cn.xiaowine.lcmanager.data.entity.UserPurchaseInfo
 import cn.xiaowine.lcmanager.data.network.OrderApi.getOrderList
 import cn.xiaowine.lcmanager.data.network.OrderApi.getOrderPart
 import cn.xiaowine.lcmanager.ui.component.SearchBar
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
@@ -173,6 +177,8 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
  */
 @Composable
 fun OrderItemFromProducts(orderCode: String, orderProducts: List<OrderProduct>) {
+    // 使用第一个产品的用户名，因为同一订单的用户名应该相同
+    val userName = orderProducts.firstOrNull()?.userName ?: "未知"
 
     Column(
         modifier = Modifier
@@ -189,25 +195,62 @@ fun OrderItemFromProducts(orderCode: String, orderProducts: List<OrderProduct>) 
             )
             .padding(16.dp)
     ) {
-        // 订单头部信息
-        Row(
+        // 订单头部信息 - 添加用户名和订单编号
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(bottom = 8.dp)
         ) {
-            Text(
-                text = "订单编号",
-                style = MiuixTheme.textStyles.body2,
-                color = MiuixTheme.colorScheme.onSurfaceVariantActions
-            )
-            Text(
-                text = orderCode,
-                style = MiuixTheme.textStyles.body1.copy(
-                    color = MiuixTheme.colorScheme.primary
+            // 订单编号和用户名行
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "订单编号",
+                        style = MiuixTheme.textStyles.body2,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                    )
+                    Text(
+                        text = orderCode,
+                        style = MiuixTheme.textStyles.body1.copy(
+                            color = MiuixTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "用户: ",
+                        style = MiuixTheme.textStyles.body2,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                    )
+                    Text(
+                        text = userName,
+                        style = MiuixTheme.textStyles.body1.copy(
+                            color = MiuixTheme.colorScheme.secondary
+                        )
+                    )
+                }
+            }
+
+            // 可以添加时间等额外信息
+            if (orderProducts.isNotEmpty() && orderProducts.first().orderTime.isNotBlank()) {
+                Text(
+                    text = "下单时间: ${orderProducts.first().orderTime}",
+                    style = MiuixTheme.textStyles.title4,
+                    color = MiuixTheme.colorScheme.onSurfaceContainerVariant,
+                    modifier = Modifier.padding(top = 4.dp)
                 )
-            )
+            }
         }
 
         // 分割线
@@ -264,6 +307,38 @@ fun OrderItemFromProducts(orderCode: String, orderProducts: List<OrderProduct>) 
                 }
             }
         }
+
+        // 添加订单总价
+        if (orderProducts.isNotEmpty()) {
+            val totalPrice = orderProducts.sumOf { it.productPrice * it.purchaseNumber }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .height(0.75.dp)
+                    .background(MiuixTheme.colorScheme.dividerLine)
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "订单总价: ",
+                    style = MiuixTheme.textStyles.body1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                )
+                Text(
+                    text = "${String.format("%.2f", totalPrice)}元",
+                    style = MiuixTheme.textStyles.title2,
+                    color = MiuixTheme.colorScheme.primary
+                )
+            }
+        }
     }
 }
 
@@ -314,14 +389,15 @@ private fun DataCard(
     var isExpanded by remember { mutableStateOf(false) }
     val rotationState by animateFloatAsState(targetValue = if (isExpanded) 0f else -180f)
 
-    Column(
-        modifier = modifier
+    Card(
+        modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 32.dp)
             .padding(top = 24.dp)
-            .clip(SmoothRoundedCornerShape(12.dp))
-            .background(MiuixTheme.colorScheme.surface)
-            .clickable { isExpanded = !isExpanded }
+            .clickable(
+                interactionSource = null,
+                indication = null
+            ) { isExpanded = !isExpanded }
     ) {
         // Header section with arrow
         Row(
@@ -437,9 +513,15 @@ private suspend fun fetchOrderData(
         // 1. Clear all existing product data
         println("Cleaning old data...")
         repository.productDao().deleteAllProducts()
+        repository.allProductDao().deleteAllProducts()
 
         var totalOrderCount = 0
         var processedOrderCount = 0
+
+        // 临时Map用于合并相同元件，以产品编码为键，关联用户的购买数据
+        val userPurchaseMap = mutableMapOf<String, MutableMap<String, UserPurchaseInfo>>()
+        val productInfoMap = mutableMapOf<String, ProductInfo>()
+
 
         // 2. Fetch new data for each user
         users.forEach { user ->
@@ -469,12 +551,12 @@ private suspend fun fetchOrderData(
                     val orderPart = getOrderPart(user.key, data.uuid)
 
                     if (orderPart.code == 200) {
-
                         // Process each product in the order
                         val products = orderPart.result!!.szProductList.ifEmpty { orderPart.result.jsProductList }
                         products.forEach { detail ->
                             processedOrderCount++
-                            // Create product even if purchaseNumber is null, it will be set to 0
+
+                            // Create normal OrderProduct
                             val orderProduct = OrderProduct(
                                 brandName = detail.brandName ?: "",
                                 productCode = detail.productCode ?: "",
@@ -489,9 +571,50 @@ private suspend fun fetchOrderData(
                                 uuid = detail.uuid ?: "",
                                 orderCode = data.orderCode,
                                 orderUuid = data.uuid,
-                                orderTime = data.orderTime
+                                orderTime = data.orderTime,
+                                userName = user.name
                             )
                             repository.productDao().insertProduct(orderProduct)
+
+                            // Merge into AllProduct
+                            val productKey = detail.productCode ?: ""
+                            if (productKey.isNotEmpty()) {
+                                // 保存产品基本信息
+                                if (!productInfoMap.containsKey(productKey)) {
+                                    productInfoMap[productKey] = ProductInfo(
+                                        brandName = detail.brandName ?: "",
+                                        productCode = detail.productCode ?: "",
+                                        breviaryImageUrl = detail.breviaryImageUrl ?: "",
+                                        catalogName = detail.catalogName ?: "",
+                                        encapStandard = detail.encapStandard ?: "",
+                                        productModel = detail.productModel ?: "",
+                                        productName = detail.productName ?: "",
+                                        productPrice = detail.productPrice ?: 0.0,
+                                        stockUnit = detail.stockUnit ?: "",
+                                        uuid = detail.uuid ?: "",
+                                        orderCode = data.orderCode,
+                                        orderUuid = data.uuid,
+                                        orderTime = data.orderTime
+                                    )
+                                }
+
+                                // 获取或创建该产品的用户购买映射
+                                val userMap = userPurchaseMap.getOrPut(productKey) { mutableMapOf() }
+
+                                // 更新该用户的购买数量
+                                val existingInfo = userMap[user.name]
+                                if (existingInfo != null) {
+                                    userMap[user.name] = existingInfo.copy(
+                                        purchaseNumber = existingInfo.purchaseNumber + detail.purchaseNumber
+                                    )
+                                } else {
+                                    userMap[user.name] = UserPurchaseInfo(
+                                        userName = user.name,
+                                        purchaseNumber = detail.purchaseNumber,
+                                        usedNumber = 0
+                                    )
+                                }
+                            }
                             println("Inserted product: ${orderProduct.productName}")
                         }
                     } else {
@@ -501,9 +624,34 @@ private suspend fun fetchOrderData(
             }
         }
 
+        // 构建和插入 AllProduct 实体
+        userPurchaseMap.forEach { (productKey, userMap) ->
+            val productInfo = productInfoMap[productKey]
+            if (productInfo != null) {
+                val allProduct = AllProduct(
+                    brandName = productInfo.brandName,
+                    productCode = productInfo.productCode,
+                    breviaryImageUrl = productInfo.breviaryImageUrl,
+                    catalogName = productInfo.catalogName,
+                    encapStandard = productInfo.encapStandard,
+                    productModel = productInfo.productModel,
+                    productName = productInfo.productName,
+                    productPrice = productInfo.productPrice,
+                    stockUnit = productInfo.stockUnit,
+                    uuid = productInfo.uuid,
+                    orderCode = productInfo.orderCode,
+                    orderUuid = productInfo.orderUuid,
+                    orderTime = productInfo.orderTime,
+                    userPurchaseInfos = userMap.values.toList()
+                )
+                repository.allProductDao().insertProduct(allProduct)
+            }
+        }
+
         println("Data refresh completed")
         println("Total orders found: $totalOrderCount")
         println("Successfully processed orders: $processedOrderCount")
+        println("Total unique products: ${productInfoMap.size}")
     } catch (e: Exception) {
         println("Error refreshing data: ${e.message}")
         e.printStackTrace()

@@ -8,7 +8,7 @@ import androidx.compose.ui.unit.dp
 
 fun main() = application {
     val state = rememberWindowState(
-        size = DpSize(800.dp, 600.dp)
+        size = DpSize(1000.dp, 800.dp)
     )
     Window(
         onCloseRequest = ::exitApplication,

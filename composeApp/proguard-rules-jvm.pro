@@ -1,3 +1,5 @@
 -dontwarn org.slf4j.helpers.SubstituteLogger
 -dontwarn io.ktor.network.sockets.SocketBase**
 -keep  class cn.xiaowine.lcmanager.data.database.*{}
+-keep class io.ktor.client.engine.cio.** { *; }
+-keep class io.ktor.serialization.kotlinx.json.** { *; }

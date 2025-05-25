@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +52,10 @@ actual fun HomeContent(navController: NavHostController, padding: PaddingValues)
 @Composable
 actual fun HomeBottomBar(navController: NavHostController) {
     var selectedMenu by remember { mutableStateOf(settingsMenuItems[0].name) }
+
+    navController.addOnDestinationChangedListener { _, destination, _ ->
+        selectedMenu = settingsMenuItems.find { it.route == destination.route }?.name ?: settingsMenuItems[0].name
+    }
 
     Row {
         Column(

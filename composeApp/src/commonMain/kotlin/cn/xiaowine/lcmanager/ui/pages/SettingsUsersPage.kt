@@ -131,7 +131,6 @@ private fun UsersList(
     ) {
         itemsIndexed(users) { _, user ->
             UserListItem(user = user, onDelete = { onDeleteUser(user) })
-            HorizontalDivider()
         }
     }
 }
@@ -241,6 +240,8 @@ private fun UserListItem(
             )
         }
     }
+
+    HorizontalDivider()
 }
 
 private suspend fun handleUserSubmission(

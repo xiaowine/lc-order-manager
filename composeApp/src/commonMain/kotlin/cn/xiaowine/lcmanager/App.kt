@@ -16,13 +16,11 @@ import cn.xiaowine.lcmanager.ui.pages.HomeContent
 import cn.xiaowine.lcmanager.ui.pages.HomeTopBar
 import cn.xiaowine.lcmanager.ui.pages.OrdersPage
 import cn.xiaowine.lcmanager.ui.pages.SettingsUsersPage
-import org.jetbrains.compose.ui.tooling.preview.Preview
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
 
 @Composable
-@Preview
 fun App() {
 
     val navController = rememberNavController()

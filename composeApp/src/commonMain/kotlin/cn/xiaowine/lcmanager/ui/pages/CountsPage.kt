@@ -4,13 +4,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -20,10 +20,24 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cn.xiaowine.lcmanager.data.database.UserDatabase
+import cn.xiaowine.lcmanager.data.entity.AllProduct
 import cn.xiaowine.lcmanager.ui.component.SearchBar
+import coil3.compose.SubcomposeAsyncImage
+import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.extra.SuperDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -34,9 +48,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  */
 @Composable
 fun CountsPage(repository: UserDatabase, padding: PaddingValues) {
-
-    val coroutineScope = rememberCoroutineScope()
-    val products = repository.productDao().getAllProducts().collectAsState(initial = emptyList())
+    val products = repository.allProductDao().getAllProducts().collectAsState(initial = emptyList())
 
     // 搜索和过滤状态
     var searchQuery by remember { mutableStateOf("") }
@@ -56,60 +68,311 @@ fun CountsPage(repository: UserDatabase, padding: PaddingValues) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // 搜索栏
             SearchBar(
                 searchQuery = searchQuery,
                 onSearchQueryChange = { searchQuery = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-                    .padding(top = 24.dp),
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 16.dp),
             )
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-                    .padding(top = 16.dp)
-            ) {
-                items(groupedProducts.toList()) { (productCode, products) ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
+            // 产品列表
+            if (products.value.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "暂无数据",
+                        style = MiuixTheme.textStyles.body1.copy(color = Color.Gray)
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .padding(top = 12.dp, bottom = 16.dp)
+                ) {
+                    items(groupedProducts.toList()) { (productCode, products) ->
+                        ProductCard(productCode, products, repository)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductCard(productCode: String, products: List<AllProduct>, repository: UserDatabase) {
+    val firstProduct = products.first()
+    val coroutineScope = rememberCoroutineScope()
+    val remainingStock = firstProduct.totalPurchaseNumber - firstProduct.totalUsedNumber
+
+    // 添加状态管理
+    var showDialog = remember { mutableStateOf(false) }
+    var usedNumber by remember { mutableStateOf(firstProduct.totalUsedNumber.toString()) }
+    var errorMessage by remember { mutableStateOf("") }
+
+    // 弹出对话框
+    SuperDialog(
+        show = showDialog,
+        title = firstProduct.productName,
+        onDismissRequest = { showDialog.value = false },
+        content = {
+            SelectionContainer {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // 产品详细信息展示
+                    Text(
+                        text = "产品编号: ${firstProduct.productCode}",
+                        style = MiuixTheme.textStyles.body2
+                    )
+
+                    Text(
+                        text = "品牌: ${firstProduct.brandName}",
+                        style = MiuixTheme.textStyles.body2,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+
+                    Text(
+                        text = "型号: ${firstProduct.productModel}",
+                        style = MiuixTheme.textStyles.body2,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+
+                    Text(
+                        text = "封装: ${firstProduct.encapStandard}",
+                        style = MiuixTheme.textStyles.body2,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+
+                    Text(
+                        text = "目录: ${firstProduct.catalogName}",
+                        style = MiuixTheme.textStyles.body2,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+
+                    Text(
+                        text = "单价: ¥${String.format("%.2f", firstProduct.productPrice)}",
+                        style = MiuixTheme.textStyles.body2,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = Color.LightGray,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                    )
+
+                    // 库存信息
+                    Text(
+                        text = "总数量: ${firstProduct.totalPurchaseNumber} ${firstProduct.stockUnit}",
+                        style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold)
+                    )
+
+                    Text(
+                        text = "已用数量: ${firstProduct.totalUsedNumber} ${firstProduct.stockUnit}",
+                        style = MiuixTheme.textStyles.body1,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+
+                    Text(
+                        text = "剩余数量: $remainingStock ${firstProduct.stockUnit}",
+                        style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = Color.LightGray,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(
+                        // 使用数量录入
+                        Text(
+                            text = "使用数量：",
+                            style = MiuixTheme.textStyles.title4
+                        )
+
+                        TextField(
+                            value = usedNumber,
+                            onValueChange = {
+                                // 仅允许输入数字
+                                if (it.isEmpty() || it.all { char -> char.isDigit() }) {
+                                    val number = it.toIntOrNull() ?: 0
+                                    // 检查是否超过库存
+                                    if (number <= firstProduct.totalPurchaseNumber) {
+                                        usedNumber = it
+                                        errorMessage = ""
+                                    } else {
+                                        errorMessage = "输入数量不能超过库存"
+                                    }
+                                }
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp)
-                        ) {
-                            Text(
-                                text = "产品编码: $productCode",
-                                style = MiuixTheme.textStyles.title3
+                                .padding(start = 4.dp),
+                        )
+                    }
+
+                    // 显示错误信息
+                    if (errorMessage.isNotEmpty()) {
+                        Text(
+                            text = errorMessage,
+                            color = Color.Red,
+                            style = MiuixTheme.textStyles.body2,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+            }
+            TextButton(
+                text = "确定",
+                onClick = {
+                    val inputUsedNumber = usedNumber.toIntOrNull() ?: 0
+                    if (inputUsedNumber >= 0) {
+                        coroutineScope.launch {
+                            val updatedPurchaseInfos = firstProduct.userPurchaseInfos.map {
+                                it.copy(usedNumber = inputUsedNumber)
+                            }
+
+                            // 创建更新后的产品实例
+                            val updatedProduct = firstProduct.copy(
+                                userPurchaseInfos = updatedPurchaseInfos
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
 
-                            // 显示第一个产品的基本信息（因为同productCode的产品基本信息应该相同）
-                            val firstProduct = products.first()
-                            Text(text = "产品名称: ${firstProduct.productName}")
-                            Text(text = "品牌: ${firstProduct.brandName}")
-                            Text(text = "型号: ${firstProduct.productModel}")
-                            Spacer(modifier = Modifier.height(8.dp))
+                            // 保存到数据库
+                            val dao = repository.allProductDao()
+                            dao.updateProduct(updatedProduct)
+                        }
+                    }
+                    showDialog.value = false
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                colors = ButtonDefaults.textButtonColorsPrimary()
+            )
+        }
+    )
 
-                            // 显示总数量和总价格
-                            val totalQuantity = products.sumOf { it.purchaseNumber }
-                            val totalPrice = products.sumOf { it.productPrice * it.purchaseNumber }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        showIndication = true,
+        onClick = {
+            // 点击时清空输入和错误信息
+            usedNumber = firstProduct.totalUsedNumber.toString()
+            errorMessage = ""
+            showDialog.value = true
+        }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+        ) {
+            if (remainingStock == 0) {
+                Text(
+                    text = "耗尽",
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(end = 12.dp, top = 14.dp)
+                        .rotate(45f),
+                    color = Color.Red
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 产品图片
+                Box(
+                    modifier = Modifier.size(100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    SubcomposeAsyncImage(
+                        model = firstProduct.breviaryImageUrl,
+                        contentDescription = firstProduct.productName,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(100.dp),
+                        loading = {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .padding(38.dp)
+                            )
+                        }
+                    )
+                }
+
+                // 产品信息 - 使用SelectionContainer包裹，使文本可选择复制
+                SelectionContainer {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 16.dp)
+                    ) {
+                        // 产品名称和编码
+                        Text(
+                            text = firstProduct.productName,
+                            style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.Bold)
+                        )
+
+                        Text(
+                            text = "编号: $productCode",
+                            style = MiuixTheme.textStyles.body2.copy(color = Color.Gray)
+                        )
+
+                        HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = Color.LightGray,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                        )
+
+                        // 产品详情信息
+                        Row {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "总数量: $totalQuantity ${firstProduct.stockUnit}",
+                                    text = "品牌: ${firstProduct.brandName}",
                                     style = MiuixTheme.textStyles.body2
                                 )
-                                Spacer(modifier = Modifier.weight(1f))
                                 Text(
-                                    text = "总价: ¥${String.format("%.2f", totalPrice)}",
+                                    text = "封装: ${firstProduct.encapStandard}",
+                                    style = MiuixTheme.textStyles.body2,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                                Text(
+                                    text = "型号: ${firstProduct.productModel}",
+                                    style = MiuixTheme.textStyles.body2,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
+
+                            Column(
+                                modifier = Modifier.padding(start = 8.dp),
+                                horizontalAlignment = Alignment.End
+                            ) {
+                                Text(
+                                    text = "${firstProduct.totalPurchaseNumber} ${firstProduct.stockUnit}",
                                     style = MiuixTheme.textStyles.body2
+                                )
+                                Text(
+                                    text = firstProduct.totalUsedNumber.let { if (it == 0) "未消耗" else "- $it" },
+                                    style = MiuixTheme.textStyles.body2,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                                Text(
+                                    text = "¥${String.format("%.2f", products.sumOf { it.productPrice * it.totalPurchaseNumber })}",
+                                    style = MiuixTheme.textStyles.body1,
+                                    modifier = Modifier.padding(top = 4.dp)
                                 )
                             }
                         }
