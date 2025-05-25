@@ -113,7 +113,8 @@ private fun ProductCard(productCode: String, products: List<AllProduct>, reposit
 
     // 添加状态管理
     var showDialog = remember { mutableStateOf(false) }
-    var usedNumber by remember { mutableStateOf(firstProduct.totalUsedNumber.toString()) }
+    var totalUsedNumber by remember { mutableStateOf("") }
+    var incrementalUsage by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
 
     // 弹出对话框
@@ -122,133 +123,188 @@ private fun ProductCard(productCode: String, products: List<AllProduct>, reposit
         title = firstProduct.productName,
         onDismissRequest = { showDialog.value = false },
         content = {
-            SelectionContainer {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    // 产品详细信息展示
-                    Text(
-                        text = "产品编号: ${firstProduct.productCode}",
-                        style = MiuixTheme.textStyles.body2
-                    )
+            // 初始化总使用量
+            if (showDialog.value && totalUsedNumber.isEmpty()) {
+                totalUsedNumber = firstProduct.totalUsedNumber.toString()
+            }
 
-                    Text(
-                        text = "品牌: ${firstProduct.brandName}",
-                        style = MiuixTheme.textStyles.body2,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-
-                    Text(
-                        text = "型号: ${firstProduct.productModel}",
-                        style = MiuixTheme.textStyles.body2,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-
-                    Text(
-                        text = "封装: ${firstProduct.encapStandard}",
-                        style = MiuixTheme.textStyles.body2,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-
-                    Text(
-                        text = "目录: ${firstProduct.catalogName}",
-                        style = MiuixTheme.textStyles.body2,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-
-                    Text(
-                        text = "单价: ¥${String.format("%.2f", firstProduct.productPrice)}",
-                        style = MiuixTheme.textStyles.body2,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-
-                    HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = Color.LightGray,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-                    )
-
-                    // 库存信息
-                    Text(
-                        text = "总数量: ${firstProduct.totalPurchaseNumber} ${firstProduct.stockUnit}",
-                        style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold)
-                    )
-
-                    Text(
-                        text = "已用数量: ${firstProduct.totalUsedNumber} ${firstProduct.stockUnit}",
-                        style = MiuixTheme.textStyles.body1,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-
-                    Text(
-                        text = "剩余数量: $remainingStock ${firstProduct.stockUnit}",
-                        style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold),
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-
-                    HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = Color.LightGray,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-                    )
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // 使用数量录入
+            Column(modifier = Modifier.padding(16.dp)) {
+                SelectionContainer {
+                    Column {
+                        // 产品详细信息展示
                         Text(
-                            text = "使用数量：",
-                            style = MiuixTheme.textStyles.title4
+                            text = "产品编号: ${firstProduct.productCode}",
+                            style = MiuixTheme.textStyles.body2
                         )
 
-                        TextField(
-                            value = usedNumber,
-                            onValueChange = {
-                                // 仅允许输入数字
-                                if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                                    val number = it.toIntOrNull() ?: 0
-                                    // 检查是否超过库存
-                                    if (number <= firstProduct.totalPurchaseNumber) {
-                                        usedNumber = it
-                                        errorMessage = ""
-                                    } else {
-                                        errorMessage = "输入数量不能超过库存"
-                                    }
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 4.dp),
-                        )
-                    }
-
-                    // 显示错误信息
-                    if (errorMessage.isNotEmpty()) {
                         Text(
-                            text = errorMessage,
-                            color = Color.Red,
+                            text = "品牌: ${firstProduct.brandName}",
+                            style = MiuixTheme.textStyles.body2,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+
+                        Text(
+                            text = "型号: ${firstProduct.productModel}",
                             style = MiuixTheme.textStyles.body2,
                             modifier = Modifier.padding(top = 4.dp)
                         )
+
+                        Text(
+                            text = "封装: ${firstProduct.encapStandard}",
+                            style = MiuixTheme.textStyles.body2,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+
+                        Text(
+                            text = "目录: ${firstProduct.catalogName}",
+                            style = MiuixTheme.textStyles.body2,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+
+                        Text(
+                            text = "单价: ¥${String.format("%.2f", firstProduct.productPrice)}",
+                            style = MiuixTheme.textStyles.body2,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+
+                        HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = Color.LightGray,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                        )
+
+                        // 库存信息
+                        Text(
+                            text = "总数量: ${firstProduct.totalPurchaseNumber} ${firstProduct.stockUnit}",
+                            style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold)
+                        )
+
+                        Text(
+                            text = "已用数量: ${firstProduct.totalUsedNumber} ${firstProduct.stockUnit}",
+                            style = MiuixTheme.textStyles.body1,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+
+                        Text(
+                            text = "剩余数量: $remainingStock ${firstProduct.stockUnit}",
+                            style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
                     }
+                }
+
+                HorizontalDivider(
+                    thickness = 0.5.dp,
+                    color = Color.LightGray,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                )
+
+                // 总使用量输入
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Text(
+                        text = "总使用量",
+                        style = MiuixTheme.textStyles.title4,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+
+                    TextField(
+                        value = totalUsedNumber,
+                        onValueChange = { input ->
+                            if (input.isEmpty() || input.all { it.isDigit() }) {
+                                val number = input.toIntOrNull() ?: 0
+                                if (number <= firstProduct.totalPurchaseNumber) {
+                                    totalUsedNumber = input
+                                    incrementalUsage = "" // 清空增量输入
+                                    errorMessage = ""
+                                } else {
+                                    errorMessage = "使用量不能超过总库存"
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 4.dp),
+                    )
+
+                    Text(
+                        text = firstProduct.stockUnit,
+                        style = MiuixTheme.textStyles.title4,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+
+                // 添加使用量输入（增量）
+                HorizontalDivider(
+                    thickness = 0.5.dp,
+                    color = Color.LightGray,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "新增使用",
+                        style = MiuixTheme.textStyles.title4,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    TextField(
+                        value = incrementalUsage,
+                        onValueChange = { input ->
+                            if (input.isEmpty() || input.all { it.isDigit() }) {
+                                val increment = input.toIntOrNull() ?: 0
+                                val currentTotal = totalUsedNumber.toIntOrNull() ?: 0
+                                val newTotal = (currentTotal - (incrementalUsage.toIntOrNull() ?: 0)) + increment
+
+                                if (newTotal <= firstProduct.totalPurchaseNumber) {
+                                    incrementalUsage = input
+                                    totalUsedNumber = newTotal.toString()
+                                    errorMessage = ""
+                                } else {
+                                    errorMessage = "增加后的使用量超过总库存"
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 4.dp),
+                    )
+
+                    Text(
+                        text = firstProduct.stockUnit,
+                        style = MiuixTheme.textStyles.title4,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+
+                // 显示错误信息
+                if (errorMessage.isNotEmpty()) {
+                    Text(
+                        text = errorMessage,
+                        color = Color.Red,
+                        style = MiuixTheme.textStyles.body2,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                 }
             }
             TextButton(
                 text = "确定",
                 onClick = {
-                    val inputUsedNumber = usedNumber.toIntOrNull() ?: 0
-                    if (inputUsedNumber >= 0) {
+                    val finalUsedNumber = totalUsedNumber.toIntOrNull() ?: 0
+                    if (finalUsedNumber >= 0 && finalUsedNumber <= firstProduct.totalPurchaseNumber) {
                         coroutineScope.launch {
                             val updatedPurchaseInfos = firstProduct.userPurchaseInfos.map {
-                                it.copy(usedNumber = inputUsedNumber)
+                                it.copy(usedNumber = finalUsedNumber)
                             }
-
-                            // 创建更新后的产品实例
                             val updatedProduct = firstProduct.copy(
                                 userPurchaseInfos = updatedPurchaseInfos
                             )
-
-                            // 保存到数据库
-                            val dao = repository.allProductDao()
-                            dao.updateProduct(updatedProduct)
+                            repository.allProductDao().updateProduct(updatedProduct)
                         }
                     }
                     showDialog.value = false
@@ -268,7 +324,8 @@ private fun ProductCard(productCode: String, products: List<AllProduct>, reposit
         showIndication = true,
         onClick = {
             // 点击时清空输入和错误信息
-            usedNumber = firstProduct.totalUsedNumber.toString()
+            totalUsedNumber = firstProduct.totalUsedNumber.toString()
+            incrementalUsage = ""
             errorMessage = ""
             showDialog.value = true
         }

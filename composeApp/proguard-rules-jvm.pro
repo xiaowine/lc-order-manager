@@ -3,3 +3,5 @@
 -keep  class cn.xiaowine.lcmanager.data.database.*{}
 -keep class io.ktor.client.engine.cio.** { *; }
 -keep class io.ktor.serialization.kotlinx.json.** { *; }
+-keep class * extends coil3.util.DecoderServiceLoaderTarget { *; }
+-keep class * extends coil3.util.FetcherServiceLoaderTarget { *; }

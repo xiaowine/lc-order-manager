@@ -10,6 +10,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import cn.xiaowine.lcmanager.data.database.UserDatabase
+import cn.xiaowine.lcmanager.ui.component.FPSMonitor
 import cn.xiaowine.lcmanager.ui.pages.CountsPage
 import cn.xiaowine.lcmanager.ui.pages.HomeBottomBar
 import cn.xiaowine.lcmanager.ui.pages.HomeContent
@@ -53,6 +54,7 @@ fun App() {
                 HomeBottomBar(navController)
             }
         )
+        FPSMonitor()
     }
 }
 

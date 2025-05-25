@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
@@ -96,15 +97,15 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // 搜索栏
             SearchBar(
                 searchQuery = searchQuery,
                 onSearchQueryChange = { searchQuery = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-                    .padding(top = 24.dp),
-
-                )
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 16.dp),
+            )
 
             // 统计卡片
             DataCard(
@@ -116,7 +117,7 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
+                    .padding(horizontal = 24.dp)
                     .padding(top = 16.dp)
             ) {
                 items(groupedProducts.toList()) { (orderCode, products) ->
@@ -180,138 +181,65 @@ fun OrderItemFromProducts(orderCode: String, orderProducts: List<OrderProduct>) 
     // 使用第一个产品的用户名，因为同一订单的用户名应该相同
     val userName = orderProducts.firstOrNull()?.userName ?: "未知"
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
-            .clip(SmoothRoundedCornerShape(16.dp))
-            .background(
-                MiuixTheme.colorScheme.surface
-            )
-            .border(
-                width = 0.75.dp,
-                color = MiuixTheme.colorScheme.dividerLine,
-                shape = SmoothRoundedCornerShape(16.dp)
-            )
-            .padding(16.dp)
-    ) {
-        // 订单头部信息 - 添加用户名和订单编号
+    SelectionContainer {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp)
-        ) {
-            // 订单编号和用户名行
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "订单编号",
-                        style = MiuixTheme.textStyles.body2,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                    )
-                    Text(
-                        text = orderCode,
-                        style = MiuixTheme.textStyles.body1.copy(
-                            color = MiuixTheme.colorScheme.primary
-                        ),
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "用户: ",
-                        style = MiuixTheme.textStyles.body2,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                    )
-                    Text(
-                        text = userName,
-                        style = MiuixTheme.textStyles.body1.copy(
-                            color = MiuixTheme.colorScheme.secondary
-                        )
-                    )
-                }
-            }
-
-            // 可以添加时间等额外信息
-            if (orderProducts.isNotEmpty() && orderProducts.first().orderTime.isNotBlank()) {
-                Text(
-                    text = "下单时间: ${orderProducts.first().orderTime}",
-                    style = MiuixTheme.textStyles.title4,
-                    color = MiuixTheme.colorScheme.onSurfaceContainerVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-        }
-
-        // 分割线
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
                 .padding(vertical = 8.dp)
-                .height(0.75.dp)
-                .background(MiuixTheme.colorScheme.dividerLine)
-        )
-
-        // 商品列表
-        orderProducts.forEachIndexed { index, product ->
-            Row(
+                .clip(SmoothRoundedCornerShape(16.dp))
+                .background(
+                    MiuixTheme.colorScheme.surface
+                )
+                .border(
+                    width = 0.75.dp,
+                    color = MiuixTheme.colorScheme.dividerLine,
+                    shape = SmoothRoundedCornerShape(16.dp)
+                )
+                .padding(16.dp)
+        ) {
+            // 订单头部信息 - 添加用户名和订单编号
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = if (index != orderProducts.lastIndex) 8.dp else 0.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(bottom = 8.dp)
             ) {
-                Column(
+                // 订单编号和用户名行
+                Row(
                     modifier = Modifier
-                        .weight(0.6f)
-                        .padding(end = 16.dp)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = product.productModel,
-                        style = MiuixTheme.textStyles.body1,
-                        color = MiuixTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = product.catalogName,
-                        style = MiuixTheme.textStyles.title4,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
 
-                Column(
-                    modifier = Modifier.weight(0.4f),
-                    horizontalAlignment = Alignment.End
-                ) {
                     Text(
-                        text = "${String.format("%.2f", product.productPrice * product.purchaseNumber)}元",
+                        text = orderCode,
                         style = MiuixTheme.textStyles.body1,
+                        modifier = Modifier.padding(start = 4.dp),
                         color = MiuixTheme.colorScheme.primary
                     )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = userName,
+                            style = MiuixTheme.textStyles.body1
+                        )
+                    }
+                }
+
+                // 可以添加时间等额外信息
+                if (orderProducts.isNotEmpty() && orderProducts.first().orderTime.isNotBlank()) {
                     Text(
-                        text = "${product.productPrice}元 × ${product.purchaseNumber}",
+                        text = "下单时间: ${orderProducts.first().orderTime}",
                         style = MiuixTheme.textStyles.title4,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                        modifier = Modifier.padding(top = 2.dp)
+                        color = MiuixTheme.colorScheme.onSurfaceVariantActions.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
             }
-        }
 
-        // 添加订单总价
-        if (orderProducts.isNotEmpty()) {
-            val totalPrice = orderProducts.sumOf { it.productPrice * it.purchaseNumber }
-
+            // 分割线
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -320,23 +248,81 @@ fun OrderItemFromProducts(orderCode: String, orderProducts: List<OrderProduct>) 
                     .background(MiuixTheme.colorScheme.dividerLine)
             )
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "订单总价: ",
-                    style = MiuixTheme.textStyles.body1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantActions
+            // 商品列表
+            orderProducts.forEachIndexed { index, product ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = if (index != orderProducts.lastIndex) 8.dp else 0.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(0.6f)
+                            .padding(end = 16.dp)
+                    ) {
+                        Text(
+                            text = product.productModel,
+                            color = MiuixTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = product.catalogName,
+                            style = MiuixTheme.textStyles.title4,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier.weight(0.4f),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text(
+                            text = "${String.format("%.2f", product.productPrice * product.purchaseNumber)}元",
+                            style = MiuixTheme.textStyles.body1,
+                            color = MiuixTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "${product.productPrice}元 × ${product.purchaseNumber}",
+                            style = MiuixTheme.textStyles.title4,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+                }
+            }
+
+            // 添加订单总价
+            if (orderProducts.isNotEmpty()) {
+                val totalPrice = orderProducts.sumOf { it.productPrice * it.purchaseNumber }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                        .height(0.75.dp)
+                        .background(MiuixTheme.colorScheme.dividerLine)
                 )
-                Text(
-                    text = "${String.format("%.2f", totalPrice)}元",
-                    style = MiuixTheme.textStyles.title2,
-                    color = MiuixTheme.colorScheme.primary
-                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "订单总价: ",
+                        style = MiuixTheme.textStyles.body1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                    )
+                    Text(
+                        text = "${String.format("%.2f", totalPrice)}元",
+                        style = MiuixTheme.textStyles.title2,
+                        color = MiuixTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }
@@ -392,7 +378,7 @@ private fun DataCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 32.dp)
+            .padding(horizontal = 24.dp)
             .padding(top = 24.dp)
             .clickable(
                 interactionSource = null,
