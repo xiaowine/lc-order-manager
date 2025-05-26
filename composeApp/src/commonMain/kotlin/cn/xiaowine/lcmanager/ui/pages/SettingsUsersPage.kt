@@ -28,7 +28,8 @@ import androidx.compose.ui.unit.dp
 import cn.xiaowine.lcmanager.data.UserInputErrorEnum
 import cn.xiaowine.lcmanager.data.dao.UserDao
 import cn.xiaowine.lcmanager.data.entity.User
-import cn.xiaowine.lcmanager.data.network.MemberApi.getCustomerInfo
+import cn.xiaowine.lcmanager.data.network.LcscApi.getCustomerInfo
+import cn.xiaowine.lcmanager.ui.component.ErrorDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -142,6 +143,7 @@ private fun UserListItem(
 ) {
     var isKeyVisible = remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
+    var isNetworkErrorDialogVisible = remember { mutableStateOf(false) }
     var verificationResult by remember { mutableStateOf<Boolean?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
@@ -227,8 +229,14 @@ private fun UserListItem(
                     isLoading = true
                     verificationResult = null
                     coroutineScope.launch {
-                        val response = getCustomerInfo(user.key)
-                        verificationResult = response.code == 200
+                        try {
+                            val response = getCustomerInfo(user.key)
+                            verificationResult = response.code == 200
+                        } catch (e: Exception) {
+                            isNetworkErrorDialogVisible.value = true
+                            verificationResult = null
+                            e.printStackTrace()
+                        }
                         isLoading = false
                     }
                 }
@@ -241,6 +249,7 @@ private fun UserListItem(
         }
     }
 
+    ErrorDialog(isNetworkErrorDialogVisible)
     HorizontalDivider()
 }
 

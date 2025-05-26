@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,8 +43,9 @@ import cn.xiaowine.lcmanager.data.entity.OrderProduct
 import cn.xiaowine.lcmanager.data.entity.ProductInfo
 import cn.xiaowine.lcmanager.data.entity.User
 import cn.xiaowine.lcmanager.data.entity.UserPurchaseInfo
-import cn.xiaowine.lcmanager.data.network.OrderApi.getOrderList
-import cn.xiaowine.lcmanager.data.network.OrderApi.getOrderPart
+import cn.xiaowine.lcmanager.data.network.LcscApi.getOrderList
+import cn.xiaowine.lcmanager.data.network.LcscApi.getOrderPart
+import cn.xiaowine.lcmanager.ui.component.ErrorDialog
 import cn.xiaowine.lcmanager.ui.component.SearchBar
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
@@ -73,6 +73,7 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
     val users = repository.userDao().getAllUsers().collectAsState(initial = emptyList())
 
     var isLoadDialogVisible = remember { mutableStateOf(false) }
+    var isNetworkErrorDialogVisible = remember { mutableStateOf(false) }
 
     // 搜索和过滤状态
     var searchQuery by remember { mutableStateOf("") }
@@ -167,15 +168,21 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
                 .padding(padding)
                 .align(Alignment.BottomEnd),
             onRefresh = {
+                isLoadDialogVisible.value = true
                 coroutineScope.launch {
-                    fetchOrderData(repository, users.value, isLoadDialogVisible)
+                    try {
+                        fetchOrderData(repository, users.value)
+                    } catch (e: Exception) {
+                        isNetworkErrorDialogVisible.value = true
+                        e.printStackTrace()
+                    }
+                    isLoadDialogVisible.value = false
                 }
             }
         )
     }
 
     SuperDialog(
-        modifier = Modifier,
         show = isLoadDialogVisible,
     ) {
         Column(
@@ -204,6 +211,7 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
 
         }
     }
+    ErrorDialog(isNetworkErrorDialogVisible)
 }
 
 /**
@@ -525,158 +533,150 @@ private fun StatisticItem(
  */
 private suspend fun fetchOrderData(
     repository: UserDatabase,
-    users: List<User>,
-    isKeyVisible: MutableState<Boolean>
+    users: List<User>
 ) {
     println("Start refreshing order data")
 
-    try {
-        isKeyVisible.value = true
-        // 1. Clear all existing product data
-        println("Cleaning old data...")
-        repository.productDao().deleteAllProducts()
-        repository.allProductDao().deleteAllProducts()
+    // 1. Clear all existing product data
+    println("Cleaning old data...")
+    repository.productDao().deleteAllProducts()
+    repository.allProductDao().deleteAllProducts()
 
-        var totalOrderCount = 0
-        var processedOrderCount = 0
+    var totalOrderCount = 0
+    var processedOrderCount = 0
 
-        // 临时Map用于合并相同元件，以产品编码为键，关联用户的购买数据
-        val userPurchaseMap = mutableMapOf<String, MutableMap<String, UserPurchaseInfo>>()
-        val productInfoMap = mutableMapOf<String, ProductInfo>()
+    // 临时Map用于合并相同元件，以产品编码为键，关联用户的购买数据
+    val userPurchaseMap = mutableMapOf<String, MutableMap<String, UserPurchaseInfo>>()
+    val productInfoMap = mutableMapOf<String, ProductInfo>()
 
+    // 2. Fetch new data for each user
+    users.forEach { user ->
+        println("Processing user: ${user.name}")
+        // Get first page and total pages
+        val firstPage = getOrderList(user.key)
+        if (firstPage.code != 200) {
+            println("Failed to get user order list, status code: ${firstPage.code}")
+            return@forEach
+        }
 
-        // 2. Fetch new data for each user
-        users.forEach { user ->
-            println("Processing user: ${user.name}")
+        val totalPages = firstPage.result!!.totalPage
+        println("Total pages: $totalPages")
 
-            // Get first page and total pages
-            val firstPage = getOrderList(user.key)
-            if (firstPage.code != 200) {
-                println("Failed to get user order list, status code: ${firstPage.code}")
-                return@forEach
-            }
+        // Process all pages
+        for (page in 1..totalPages) {
+            println("Fetching page $page")
+            val orderList = getOrderList(user.key, currPage = page)
 
-            val totalPages = firstPage.result!!.totalPage
-            println("Total pages: $totalPages")
+            // Count total orders for verification
+            totalOrderCount += orderList.result?.dataList?.size ?: 0
 
-            // Process all pages
-            for (page in 1..totalPages) {
-                println("Fetching page $page")
-                val orderList = getOrderList(user.key, currPage = page)
+            // Process each order
+            orderList.result?.dataList?.forEach { data ->
+                println("Getting order details: ${data.orderCode}")
+                val orderPart = getOrderPart(user.key, data.uuid)
 
-                // Count total orders for verification
-                totalOrderCount += orderList.result?.dataList?.size ?: 0
+                if (orderPart.code == 200) {
+                    // Process each product in the order
+                    val products = orderPart.result!!.szProductList.ifEmpty { orderPart.result.jsProductList }
+                    products.forEach { detail ->
+                        processedOrderCount++
 
-                // Process each order
-                orderList.result?.dataList?.forEach { data ->
-                    println("Getting order details: ${data.orderCode}")
-                    val orderPart = getOrderPart(user.key, data.uuid)
+                        // Create normal OrderProduct
+                        val orderProduct = OrderProduct(
+                            brandName = detail.brandName ?: "",
+                            productCode = detail.productCode ?: "",
+                            breviaryImageUrl = detail.breviaryImageUrl ?: "",
+                            catalogName = detail.catalogName ?: "",
+                            encapStandard = detail.encapStandard ?: "",
+                            productModel = detail.productModel ?: "",
+                            productName = detail.productName ?: "",
+                            productPrice = detail.productPrice ?: 0.0,
+                            purchaseNumber = detail.purchaseNumber,
+                            stockUnit = detail.stockUnit ?: "",
+                            uuid = detail.uuid ?: "",
+                            orderCode = data.orderCode,
+                            orderUuid = data.uuid,
+                            orderTime = data.orderTime,
+                            userName = user.name
+                        )
+                        repository.productDao().insertProduct(orderProduct)
 
-                    if (orderPart.code == 200) {
-                        // Process each product in the order
-                        val products = orderPart.result!!.szProductList.ifEmpty { orderPart.result.jsProductList }
-                        products.forEach { detail ->
-                            processedOrderCount++
-
-                            // Create normal OrderProduct
-                            val orderProduct = OrderProduct(
-                                brandName = detail.brandName ?: "",
-                                productCode = detail.productCode ?: "",
-                                breviaryImageUrl = detail.breviaryImageUrl ?: "",
-                                catalogName = detail.catalogName ?: "",
-                                encapStandard = detail.encapStandard ?: "",
-                                productModel = detail.productModel ?: "",
-                                productName = detail.productName ?: "",
-                                productPrice = detail.productPrice ?: 0.0,
-                                purchaseNumber = detail.purchaseNumber,
-                                stockUnit = detail.stockUnit ?: "",
-                                uuid = detail.uuid ?: "",
-                                orderCode = data.orderCode,
-                                orderUuid = data.uuid,
-                                orderTime = data.orderTime,
-                                userName = user.name
-                            )
-                            repository.productDao().insertProduct(orderProduct)
-
-                            // Merge into AllProduct
-                            val productKey = detail.productCode ?: ""
-                            if (productKey.isNotEmpty()) {
-                                // 保存产品基本信息
-                                if (!productInfoMap.containsKey(productKey)) {
-                                    productInfoMap[productKey] = ProductInfo(
-                                        brandName = detail.brandName ?: "",
-                                        productCode = detail.productCode ?: "",
-                                        breviaryImageUrl = detail.breviaryImageUrl ?: "",
-                                        catalogName = detail.catalogName ?: "",
-                                        encapStandard = detail.encapStandard ?: "",
-                                        productModel = detail.productModel ?: "",
-                                        productName = detail.productName ?: "",
-                                        productPrice = detail.productPrice ?: 0.0,
-                                        stockUnit = detail.stockUnit ?: "",
-                                        uuid = detail.uuid ?: "",
-                                        orderCode = data.orderCode,
-                                        orderUuid = data.uuid,
-                                        orderTime = data.orderTime
-                                    )
-                                }
-
-                                // 获取或创建该产品的用户购买映射
-                                val userMap = userPurchaseMap.getOrPut(productKey) { mutableMapOf() }
-
-                                // 更新该用户的购买数量
-                                val existingInfo = userMap[user.name]
-                                if (existingInfo != null) {
-                                    userMap[user.name] = existingInfo.copy(
-                                        purchaseNumber = existingInfo.purchaseNumber + detail.purchaseNumber
-                                    )
-                                } else {
-                                    userMap[user.name] = UserPurchaseInfo(
-                                        userName = user.name,
-                                        purchaseNumber = detail.purchaseNumber,
-                                        usedNumber = 0
-                                    )
-                                }
+                        // Merge into AllProduct
+                        val productKey = detail.productCode ?: ""
+                        if (productKey.isNotEmpty()) {
+                            // 保存产品基本信息
+                            if (!productInfoMap.containsKey(productKey)) {
+                                productInfoMap[productKey] = ProductInfo(
+                                    brandName = detail.brandName ?: "",
+                                    productCode = detail.productCode ?: "",
+                                    breviaryImageUrl = detail.breviaryImageUrl ?: "",
+                                    catalogName = detail.catalogName ?: "",
+                                    encapStandard = detail.encapStandard ?: "",
+                                    productModel = detail.productModel ?: "",
+                                    productName = detail.productName ?: "",
+                                    productPrice = detail.productPrice ?: 0.0,
+                                    stockUnit = detail.stockUnit ?: "",
+                                    uuid = detail.uuid ?: "",
+                                    orderCode = data.orderCode,
+                                    orderUuid = data.uuid,
+                                    orderTime = data.orderTime
+                                )
                             }
-                            println("Inserted product: ${orderProduct.productName}")
+
+                            // 获取或创建该产品的用户购买映射
+                            val userMap = userPurchaseMap.getOrPut(productKey) { mutableMapOf() }
+
+                            // 更新该用户的购买数量
+                            val existingInfo = userMap[user.name]
+                            if (existingInfo != null) {
+                                userMap[user.name] = existingInfo.copy(
+                                    purchaseNumber = existingInfo.purchaseNumber + detail.purchaseNumber
+                                )
+                            } else {
+                                userMap[user.name] = UserPurchaseInfo(
+                                    userName = user.name,
+                                    purchaseNumber = detail.purchaseNumber,
+                                    usedNumber = 0
+                                )
+                            }
                         }
-                    } else {
-                        println("Failed to get order details for ${data.orderCode}, status code: ${orderPart.code}")
+                        println("Inserted product: ${orderProduct.productName}")
                     }
+                } else {
+                    println("Failed to get order details for ${data.orderCode}, status code: ${orderPart.code}")
                 }
+
             }
         }
 
-        // 构建和插入 AllProduct 实体
-        userPurchaseMap.forEach { (productKey, userMap) ->
-            val productInfo = productInfoMap[productKey]
-            if (productInfo != null) {
-                val allProduct = AllProduct(
-                    brandName = productInfo.brandName,
-                    productCode = productInfo.productCode,
-                    breviaryImageUrl = productInfo.breviaryImageUrl,
-                    catalogName = productInfo.catalogName,
-                    encapStandard = productInfo.encapStandard,
-                    productModel = productInfo.productModel,
-                    productName = productInfo.productName,
-                    productPrice = productInfo.productPrice,
-                    stockUnit = productInfo.stockUnit,
-                    uuid = productInfo.uuid,
-                    orderCode = productInfo.orderCode,
-                    orderUuid = productInfo.orderUuid,
-                    orderTime = productInfo.orderTime,
-                    userPurchaseInfos = userMap.values.toList()
-                )
-                repository.allProductDao().insertProduct(allProduct)
-            }
-        }
-
-        println("Data refresh completed")
-        println("Total orders found: $totalOrderCount")
-        println("Successfully processed orders: $processedOrderCount")
-        println("Total unique products: ${productInfoMap.size}")
-    } catch (e: Exception) {
-        println("Error refreshing data: ${e.message}")
-        e.printStackTrace()
     }
-    isKeyVisible.value = false
+
+    // 构建和插入 AllProduct 实体
+    userPurchaseMap.forEach { (productKey, userMap) ->
+        val productInfo = productInfoMap[productKey]
+        if (productInfo != null) {
+            val allProduct = AllProduct(
+                brandName = productInfo.brandName,
+                productCode = productInfo.productCode,
+                breviaryImageUrl = productInfo.breviaryImageUrl,
+                catalogName = productInfo.catalogName,
+                encapStandard = productInfo.encapStandard,
+                productModel = productInfo.productModel,
+                productName = productInfo.productName,
+                productPrice = productInfo.productPrice,
+                stockUnit = productInfo.stockUnit,
+                uuid = productInfo.uuid,
+                orderCode = productInfo.orderCode,
+                orderUuid = productInfo.orderUuid,
+                orderTime = productInfo.orderTime,
+                userPurchaseInfos = userMap.values.toList()
+            )
+            repository.allProductDao().insertProduct(allProduct)
+        }
+    }
+
+    println("Data refresh completed")
+    println("Total orders found: $totalOrderCount")
+    println("Successfully processed orders: $processedOrderCount")
+    println("Total unique products: ${productInfoMap.size}")
 }
