@@ -71,7 +71,7 @@ actual fun HomeBottomBar(navController: NavHostController) {
                     .padding(32.dp)
             ) {
                 Text(
-                    text = "立创商城\n订单辅助",
+                    text = "立创商城\n元件工具",
                     color = MiuixTheme.colorScheme.primary,
                     style = MiuixTheme.textStyles.main.copy(fontWeight = FontWeight.Bold)
                 )
