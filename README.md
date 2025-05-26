@@ -15,8 +15,8 @@
 ![b.png](docs/b.png)
 ![c.png](docs/c.png)
 ![a1.png](docs/a1.png)
-![b1.png](docs/b1.png)
-![c1.png](docs/c1.png)
+![c1.png](docs/b1.png)
+![b1.png](docs/c1.png)
 
 ## 主要特性
 - 订单信息管理与查询
