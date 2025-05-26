@@ -68,6 +68,9 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = libs.versions.vercode.get().toInt()
         versionName = libs.versions.version.get()
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
     val config = localProperties.getProperty("androidStoreFile")?.let {
         signingConfigs.create("release") {
@@ -100,7 +103,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
 }
 
 dependencies {

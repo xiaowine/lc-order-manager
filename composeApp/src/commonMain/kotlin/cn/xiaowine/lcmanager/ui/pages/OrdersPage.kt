@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -76,7 +77,8 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
     // 搜索和过滤状态
     var searchQuery by remember { mutableStateOf("") }
 
-    // 过滤产品
+
+    // 获取所有可用的分类选项，需要考虑其他筛选条件的影响
     val filteredProducts = remember(products.value, searchQuery) {
         products.value.filter { product ->
             val matchesSearch = searchQuery.isEmpty() ||
@@ -92,36 +94,70 @@ fun OrdersPage(repository: UserDatabase, padding: PaddingValues) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // 搜索栏
-            SearchBar(
-                searchQuery = searchQuery,
-                onSearchQueryChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(top = 16.dp),
-            )
-
-            // 统计卡片
-            DataCard(
-                orderCount = products.value.groupBy { it.orderCode }.size,
-                itemCount = products.value.size,
-            )
-
-            // 产品列表
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(top = 16.dp)
+        if (products.value.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
             ) {
-                items(groupedProducts.toList()) { (orderCode, products) ->
-                    OrderItemFromProducts(orderCode = orderCode, orderProducts = products)
+                Text(
+                    text = "暂无数据",
+                    style = MiuixTheme.textStyles.body1,
+                    color = Color.Gray
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                // 搜索栏
+                SearchBar(
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .padding(top = 16.dp),
+                )
+
+                if (filteredProducts.isEmpty()) {
+                    // 如果筛选后没有结果，显示提示信息
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "暂无符合条件的订单",
+                                style = MiuixTheme.textStyles.body1,
+                                color = Color.Gray
+                            )
+                        }
+                    }
+                } else {
+
+                    // 统计卡片
+                    DataCard(
+                        orderCount = products.value.groupBy { it.orderCode }.size,
+                        itemCount = products.value.size,
+                    )
+
+                    // 产品列表
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp)
+                            .padding(top = 16.dp)
+                    ) {
+                        items(groupedProducts.toList()) { (orderCode, products) ->
+                            OrderItemFromProducts(orderCode = orderCode, orderProducts = products)
+                        }
+                    }
                 }
             }
         }
