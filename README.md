@@ -14,12 +14,14 @@
 
 ## 软件截图
 <details>
+
 ![a.png](docs/a.png)
 ![b.png](docs/b.png)
 ![c.png](docs/c.png)
 ![a1.png](docs/a1.png)
 ![c1.png](docs/b1.png)
 ![b1.png](docs/c1.png)
+
 </details>
 
 ## 主要特性
