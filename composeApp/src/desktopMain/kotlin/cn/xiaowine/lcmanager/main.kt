@@ -5,6 +5,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import java.awt.Dimension
 
 fun main() = application {
     val state = rememberWindowState(
@@ -15,6 +16,7 @@ fun main() = application {
         title = "LcManager",
         state = state,
     ) {
+        window.minimumSize = Dimension(500, 400)
         App()
     }
 }
